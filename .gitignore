@@ -11,3 +11,15 @@ wheels/
 
 # Windows reserved names
 nul
+
+# Data directory
+data/
+
+# Generated reports
+report_*/
+
+# Database files
+*.db
+
+# Temporary JSON data files
+*.json
