@@ -1,0 +1,121 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "web_browser": {
+      "type": "local",
+      "command": [".venv/Scripts/python.exe", "-m", "mcp_server.web_browser.main"],
+      "enabled": true
+    }
+  },
+  "agent": {
+    "news-collector": {
+      "mode": "primary",
+      "description": "新闻资讯收集智能体 - S级（事件驱动架构）",
+      "temperature": 0.3,
+      "prompt": "{file:./prompts/news-collector.txt}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "webfetch": false,
+        "read": true,
+        "grep": true,
+        "web-browser*": true
+      },
+      "permission": {
+        "bash": {
+          "python *": "allow",
+          "cd *": "allow",
+          "ls": "allow",
+          "mkdir *": "allow"
+        },
+        "task": {
+          "*": "allow"
+        }
+      }
+    },
+    "event-aggregator": {
+      "mode": "subagent",
+      "description": "事件聚合器 - 将多条新闻聚合为事件",
+      "prompt": "{file:.opencode/agents/event-aggregator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 5
+    },
+    "validator": {
+      "mode": "subagent",
+      "description": "事件验证器 - 验证事件真实性（主动探索型）",
+      "prompt": "{file:.opencode/agents/validator.md}",
+      "hidden": true,
+      "temperature": 0.2,
+      "maxSteps": 8,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "web-browser_*": true
+      },
+      "permission": {
+        "bash": {
+          "python *": "allow"
+        }
+      }
+    },
+    "timeline-builder": {
+      "mode": "subagent",
+      "description": "时间轴构建器 - 构建事件发展脉络（主动探索型）",
+      "prompt": "{file:.opencode/agents/timeline-builder.md}",
+      "hidden": true,
+      "temperature": 0.2,
+      "maxSteps": 10,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "web-browser_*": true
+      },
+      "permission": {
+        "bash": {
+          "python *": "allow"
+        }
+      }
+    },
+    "predictor": {
+      "mode": "subagent",
+      "description": "趋势预测器 - 预测事件未来发展（主动探索型）",
+      "prompt": "{file:.opencode/agents/predictor.md}",
+      "hidden": true,
+      "temperature": 0.3,
+      "maxSteps": 8,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "web-browser_*": true
+      },
+      "permission": {
+        "bash": {
+          "python *": "allow"
+        }
+      }
+    },
+    "synthesizer": {
+      "mode": "subagent",
+      "description": "报告生成器 - 生成最终结构化报告",
+      "prompt": "{file:.opencode/agents/synthesizer.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "read": true
+      },
+      "permission": {
+        "bash": {
+          "mkdir *": "allow"
+        }
+      }
+    }
+  }
+}

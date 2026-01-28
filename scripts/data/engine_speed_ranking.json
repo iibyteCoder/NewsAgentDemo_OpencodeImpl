@@ -1,0 +1,85 @@
+{
+  "timestamp": "2026-01-28 23:00:24",
+  "test_query": "人工智能",
+  "search_type": "news",
+  "repeat": 3,
+  "ranking": [
+    {
+      "engine": "baidu",
+      "success_count": 3,
+      "error_count": 0,
+      "times": [
+        6.804415941238403,
+        6.13847017288208,
+        7.076191186904907
+      ],
+      "avg_time": 6.673025767008464,
+      "min_time": 6.13847017288208,
+      "max_time": 7.076191186904907,
+      "success_rate": 1.0
+    },
+    {
+      "engine": "sogou",
+      "success_count": 3,
+      "error_count": 0,
+      "times": [
+        7.2293291091918945,
+        8.379642009735107,
+        6.900338172912598
+      ],
+      "avg_time": 7.503103097279866,
+      "min_time": 6.900338172912598,
+      "max_time": 8.379642009735107,
+      "success_rate": 1.0
+    },
+    {
+      "engine": "google",
+      "success_count": 3,
+      "error_count": 0,
+      "times": [
+        18.160656213760376,
+        7.367340803146362,
+        6.876832485198975
+      ],
+      "avg_time": 10.801609834035238,
+      "min_time": 6.876832485198975,
+      "max_time": 18.160656213760376,
+      "success_rate": 1.0
+    },
+    {
+      "engine": "360",
+      "success_count": 3,
+      "error_count": 0,
+      "times": [
+        19.318414211273193,
+        5.6577112674713135,
+        7.5193190574646
+      ],
+      "avg_time": 10.831814845403036,
+      "min_time": 5.6577112674713135,
+      "max_time": 19.318414211273193,
+      "success_rate": 1.0
+    },
+    {
+      "engine": "bing",
+      "success_count": 3,
+      "error_count": 0,
+      "times": [
+        28.4949734210968,
+        25.08648681640625,
+        25.412893772125244
+      ],
+      "avg_time": 26.331451336542766,
+      "min_time": 25.08648681640625,
+      "max_time": 28.4949734210968,
+      "success_rate": 1.0
+    }
+  ],
+  "recommended_order": [
+    "baidu",
+    "sogou",
+    "google",
+    "360",
+    "bing"
+  ]
+}

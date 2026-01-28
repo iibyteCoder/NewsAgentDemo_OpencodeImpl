@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(ls:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(uv pip list:*)",
+      "Bash(if:*)",
+      "Bash(then ls -la .opencode/agents/)",
+      "Bash(else echo \"agents directory does not exist\")",
+      "Bash(fi)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(grep:*)",
+      "Bash(git mv:*)",
+      "Bash(.venv\\\\Scripts\\\\python.exe:*)",
+      "Bash(iconv:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(powershell:*)"
+    ]
+  }
+}

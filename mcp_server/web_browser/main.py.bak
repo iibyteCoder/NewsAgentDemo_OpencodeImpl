@@ -1,0 +1,884 @@
+"""
+百度搜索 MCP Server
+
+提供百度搜索功能
+使用 FastMCP + Playwright 实现（完美解决反爬虫问题）
+"""
+
+import asyncio
+import json
+import random
+import re
+import time
+from typing import List, Optional
+
+from loguru import logger
+from mcp.server.fastmcp import FastMCP
+
+# 导入浏览器池
+try:
+    from .browser_pool import get_browser_pool
+    from .multi_engine import get_multi_engine
+except ImportError:
+    from browser_pool import get_browser_pool
+    from multi_engine import get_multi_engine
+
+
+class RateLimiter:
+    """增强型速率限制器 - 基于域名和搜索引擎的速率限制（移除全局限制以支持并发）"""
+
+    def __init__(
+        self,
+        time_window: float = 1.0,
+        max_domain_requests: int = 2,
+        max_engine_requests: int = 2,
+    ):
+        """
+        Args:
+            time_window: 时间窗口（秒）
+            max_domain_requests: 同一域名时间窗口内最大请求数
+            max_engine_requests: 同一搜索引擎时间窗口内最大请求数
+        """
+        self.time_window = time_window
+        self.max_domain_requests = max_domain_requests
+        self.max_engine_requests = max_engine_requests
+
+        # 域名维度的请求记录 {domain: [timestamps]}
+        self.domain_requests: dict = {}
+
+        # 搜索引擎维度的请求记录 {engine_name: [timestamps]}
+        self.engine_requests: dict = {}
+
+        self._lock = asyncio.Lock()
+
+    def _extract_domain(self, url: str) -> str:
+        """从URL中提取域名"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            return parsed.netloc or "unknown"
+        except Exception:
+            return "unknown"
+
+    async def acquire(self, domain: Optional[str] = None, engine: Optional[str] = None):
+        """获取访问许可（支持域名和引擎两个维度的速率限制）
+
+        Args:
+            domain: 域名（可选，用于域名级别的限流）
+            engine: 搜索引擎名称（可选，用于引擎级别的限流）
+
+        Note:
+            移除了全局限制，允许不同域名/引擎的并发请求
+        """
+        async with self._lock:
+            now = time.time()
+
+            # 1. 域名级别速率限制
+            if domain:
+                if domain not in self.domain_requests:
+                    self.domain_requests[domain] = []
+
+                # 清理过期记录
+                self.domain_requests[domain] = [
+                    t for t in self.domain_requests[domain] if now - t < self.time_window
+                ]
+
+                if len(self.domain_requests[domain]) >= self.max_domain_requests:
+                    sleep_time = self.time_window - (now - self.domain_requests[domain][0])
+                    if sleep_time > 0:
+                        logger.debug(f"⏸️ [域名限制 {domain}] 等待 {sleep_time:.2f} 秒")
+                        await asyncio.sleep(sleep_time)
+                        now = time.time()
+                        self.domain_requests[domain] = [
+                            t for t in self.domain_requests[domain] if now - t < self.time_window
+                        ]
+
+                self.domain_requests[domain].append(now)
+
+            # 2. 搜索引擎级别速率限制
+            if engine:
+                if engine not in self.engine_requests:
+                    self.engine_requests[engine] = []
+
+                # 清理过期记录
+                self.engine_requests[engine] = [
+                    t for t in self.engine_requests[engine] if now - t < self.time_window
+                ]
+
+                if len(self.engine_requests[engine]) >= self.max_engine_requests:
+                    sleep_time = self.time_window - (now - self.engine_requests[engine][0])
+                    if sleep_time > 0:
+                        logger.debug(f"⏸️ [引擎限制 {engine}] 等待 {sleep_time:.2f} 秒")
+                        await asyncio.sleep(sleep_time)
+                        now = time.time()
+                        self.engine_requests[engine] = [
+                            t for t in self.engine_requests[engine] if now - t < self.time_window
+                        ]
+
+                self.engine_requests[engine].append(now)
+
+# ========== 配置 ==========
+MAX_CONCURRENT_BROWSERS = 2  # 最大并发浏览器数量
+MAX_CONTEXTS_PER_BROWSER = 5  # 每个浏览器最大上下文数
+
+# 速率限制配置（域名和引擎级别）
+MAX_DOMAIN_REQUESTS_PER_SECOND = 2  # 同一域名每秒最多2次
+MAX_ENGINE_REQUESTS_PER_SECOND = 2  # 同一引擎每秒最多2次
+
+# 代理配置
+PROXY_CONFIG = {
+    "server": "localhost:7897",  # 代理服务器地址
+}
+
+# User-Agent 常量
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
+
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+def get_random_user_agent() -> str:
+    """获取随机 User-Agent"""
+    return random.choice(USER_AGENTS)
+
+# 使用 FastMCP 创建服务器
+server = FastMCP("baidu_search")
+
+# 初始化浏览器池（带代理）
+browser_pool = get_browser_pool(
+    max_concurrent=MAX_CONCURRENT_BROWSERS,
+    max_contexts=MAX_CONTEXTS_PER_BROWSER,
+    proxy=PROXY_CONFIG,
+)
+logger.info(f"✅ 浏览器池已初始化 (max_concurrent={MAX_CONCURRENT_BROWSERS})")
+
+# 初始化速率限制器（移除全局限制，支持并发）
+rate_limiter = RateLimiter(
+    time_window=1.0,
+    max_domain_requests=MAX_DOMAIN_REQUESTS_PER_SECOND,
+    max_engine_requests=MAX_ENGINE_REQUESTS_PER_SECOND
+)
+logger.info(
+    f"✅ 速率限制器已初始化 "
+    f"(域名限制={MAX_DOMAIN_REQUESTS_PER_SECOND}次/秒, "
+    f"引擎限制={MAX_ENGINE_REQUESTS_PER_SECOND}次/秒, "
+    f"无全局限制)"
+)
+
+
+@server.tool()
+async def baidu_search(
+    query: str,
+    num_results: int = 30,
+    time_range: Optional[str] = None,
+) -> str:
+    """百度搜索 - 🔥 这是主要的新闻搜索工具，必须使用！
+
+    ⚠️ 重要提示：
+    - 不要使用 RSS 工具，必须使用本工具搜索新闻
+    - 适合搜索最新新闻、热点话题、特定关键词
+    - 使用 Playwright 浏览器自动化，完美解决反爬虫问题
+
+    Args:
+        query: 搜索查询（支持中文，如 "人工智能最新进展"）
+        num_results: 返回结果数量（默认 30，建议 20-50）
+        time_range: 时间范围过滤（暂不支持，保留参数）
+
+    Returns:
+        JSON 格式的搜索结果，包含标题、链接、摘要、来源等
+
+    Examples:
+        - baidu_search("人工智能最新消息", 30)  # 搜索AI相关新闻
+        - baidu_search("股市今日行情", 40)     # 搜索股市新闻
+    """
+    logger.info(f"🔍 [百度搜索] {query}, 结果数={num_results}")
+
+    # 🔥 应用速率限制
+    await rate_limiter.acquire()
+
+    try:
+        import urllib.parse
+
+        # 百度搜索 URL
+        encoded_query = urllib.parse.quote(query)
+        search_url = f"https://www.baidu.com/s?wd={encoded_query}&rn={num_results}"
+
+        # 🔥 使用浏览器池获取页面（带随机 User-Agent）
+        random_user_agent = get_random_user_agent()
+        async with browser_pool.get_page(user_agent=random_user_agent) as page:
+            # 访问搜索页面
+            logger.info(f"   🌐 正在访问: {search_url}")
+            await page.goto(search_url, timeout=30000)
+
+            # ⚡ 移除所有延迟，直接提取结果
+
+            # 提取搜索结果
+            results = []
+
+            # 使用 Playwright 查找所有 .result 元素
+            result_elements = await page.query_selector_all(".result")
+            logger.info(f"   🔍 找到 {len(result_elements)} 个结果")
+
+            # 获取所有找到的结果（不限制数量）
+            for idx, result_elem in enumerate(result_elements):
+                try:
+                    # 提取标题和链接
+                    title_elem = await result_elem.query_selector("h3.t")
+                    if not title_elem:
+                        title_elem = await result_elem.query_selector("h3")
+
+                    if not title_elem:
+                        continue
+
+                    # 获取标题文本
+                    title = await title_elem.text_content()
+                    title = title.strip() if title else ""
+
+                    # 获取链接
+                    link_elem = await title_elem.query_selector("a")
+                    url = ""
+                    if link_elem:
+                        url = await link_elem.get_attribute("href")
+                        url = url or ""
+
+                    # 提取摘要
+                    summary_elem = await result_elem.query_selector("div.c-abstract")
+                    if not summary_elem:
+                        summary_elem = await result_elem.query_selector("div.c-span-last")
+                    summary = ""
+                    if summary_elem:
+                        summary = await summary_elem.text_content()
+                        summary = summary.strip() if summary else ""
+
+                    # 提取来源
+                    source_elem = await result_elem.query_selector("span.c-color-gray")
+                    source = ""
+                    if source_elem:
+                        source = await source_elem.text_content()
+                        source = source.strip() if source else ""
+
+                    # 提取时间
+                    time_elem = await result_elem.query_selector("span.newTimeFactor")
+                    time_str = ""
+                    if time_elem:
+                        time_str = await time_elem.text_content()
+                        time_str = time_str.strip() if time_str else ""
+
+                    if title:
+                        results.append(
+                            {
+                                "title": title,
+                                "url": url,
+                                "summary": summary,
+                                "source": source,
+                                "time": time_str,
+                            }
+                        )
+
+                except Exception as e:
+                    logger.debug(f"解析单个结果失败: {e}")
+                    continue
+
+        logger.info(f"✅ 搜索完成: 获得 {len(results)} 个结果")
+
+        return json.dumps(
+            {"query": query, "total": len(results), "results": results},
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error(f"❌ 百度搜索失败: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+
+        return json.dumps(
+            {"query": query, "total": 0, "results": [], "error": str(e)},
+            ensure_ascii=False,
+        )
+
+
+@server.tool()
+async def baidu_news_search(
+    query: str,
+    num_results: int = 30,
+) -> str:
+    """百度新闻搜索 - 专门搜索新闻内容
+
+    使用 Playwright 浏览器自动化，完美解决反爬虫问题
+
+    Args:
+        query: 搜索查询（如 "人工智能"、"科技新闻"）
+        num_results: 返回结果数量（默认 30，建议 30-50）
+
+    Returns:
+        JSON 格式的新闻搜索结果
+    """
+    logger.info(f"📰 [百度新闻搜索] {query}, 结果数={num_results}")
+
+    # 🔥 应用速率限制
+    await rate_limiter.acquire()
+
+    try:
+        import urllib.parse
+
+        # 百度新闻搜索 URL
+        encoded_query = urllib.parse.quote(query)
+        news_url = f"https://www.baidu.com/s?tn=news&rtt=1&bsst=1&cl=2&wd={encoded_query}"
+
+        # 🔥 使用浏览器池获取页面（带随机 User-Agent）
+        random_user_agent = get_random_user_agent()
+        async with browser_pool.get_page(user_agent=random_user_agent) as page:
+            # 访问新闻搜索页面
+            logger.info(f"   🌐 正在访问: {news_url}")
+            await page.goto(news_url, timeout=30000)
+
+            # ⚡ 移除所有延迟
+
+            # 检查是否被重定向到验证页面
+            page_title = await page.title()
+            logger.info(f"   📄 页面标题: {page_title}")
+
+            if "验证" in page_title or "安全" in page_title:
+                logger.error("   🚫 被百度安全验证拦截！")
+                return json.dumps(
+                    {"query": query, "total": 0, "results": [], "error": "被百度安全验证拦截"},
+                    ensure_ascii=False,
+                )
+
+            # 提取搜索结果
+            results = []
+
+            # 🔥 使用正确的选择器：百度新闻使用 div[tpl="news-normal"]
+            result_elements = await page.query_selector_all('div[tpl="news-normal"]')
+            logger.info(f"   🔍 找到 {len(result_elements)} 个新闻结果")
+
+            # 获取所有找到的结果（不限制数量）
+            for result_elem in result_elements:
+                try:
+                    # 🔥 从 mu 属性获取链接（最可靠）
+                    url = await result_elem.get_attribute("mu")
+                    if not url:
+                        # 备选：从标题链接获取
+                        title_link = await result_elem.query_selector("h3 > a")
+                        if title_link:
+                            url = await title_link.get_attribute("href")
+                    url = url or ""
+
+                    # 🔥 提取标题 - h3 > a
+                    title_elem = await result_elem.query_selector("h3")
+                    if not title_elem:
+                        continue
+
+                    title_text = await title_elem.text_content()
+                    title = title_text.strip() if title_text else ""
+
+                    # 🔥 提取时间 - span.c-color-gray2（第一个）
+                    time_elem = await result_elem.query_selector("span.c-color-gray2")
+                    time_str = ""
+                    if time_elem:
+                        time_text = await time_elem.text_content()
+                        # 移除"发布于："前缀
+                        time_str = time_text.strip().replace("发布于：", "") if time_text else ""
+
+                    # 🔥 提取摘要 - span.c-font-normal.c-color-text（第二个）
+                    summary_elem = await result_elem.query_selector(
+                        "div.c-row > span.c-font-normal.c-color-text"
+                    )
+                    summary = ""
+                    if summary_elem:
+                        summary_text = await summary_elem.text_content()
+                        summary = summary_text.strip() if summary_text else ""
+
+                    # 🔥 提取来源 - div.news-source_Xj4Dv > a
+                    source_elem = await result_elem.query_selector("div.news-source_Xj4Dv > a")
+                    source = ""
+                    if source_elem:
+                        source_text = await source_elem.text_content()
+                        source = source_text.strip() if source_text else ""
+
+                    if title:
+                        results.append(
+                            {
+                                "title": title,
+                                "url": url,
+                                "summary": summary,
+                                "source": source,
+                                "time": time_str,
+                            }
+                        )
+                        logger.debug(f"   ✅ 解析成功: {title[:50]}...")
+
+                except Exception as e:
+                    logger.debug(f"解析单条新闻失败: {e}")
+                    continue
+
+        logger.info(f"✅ 新闻搜索完成: 获得 {len(results)} 条新闻")
+
+        return json.dumps(
+            {"query": query, "total": len(results), "results": results},
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error(f"❌ 百度新闻搜索失败: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+
+        return json.dumps(
+            {"query": query, "total": 0, "results": [], "error": str(e)},
+            ensure_ascii=False,
+        )
+
+
+@server.tool()
+async def fetch_article_content(url: str) -> str:
+    """获取文章正文内容 - 🔥 使用浏览器池复用浏览器实例
+
+    Args:
+        url: 文章链接
+
+    Returns:
+        JSON 格式的文章内容，包含标题、正文、来源等
+
+    Examples:
+        >>> fetch_article_content("https://news.example.com/article/123")
+    """
+    logger.info(f"📄 [获取文章正文] URL: {url}")
+
+    # 🔥 应用速率限制
+    await rate_limiter.acquire()
+
+    try:
+        # 🔥 使用浏览器池获取页面（带随机 User-Agent）
+        random_user_agent = get_random_user_agent()
+        async with browser_pool.get_page(user_agent=random_user_agent) as page:
+            # 访问文章页面
+            logger.info(f"   🌐 正在访问: {url}")
+            await page.goto(url, timeout=30000)
+
+            # ⚡ 移除所有延迟，直接提取
+
+            # 检查是否被重定向到验证页面
+            page_title = await page.title()
+            if "验证" in page_title or "安全" in page_title:
+                logger.warning("   ⚠️ 被安全验证拦截，返回空内容")
+                return json.dumps(
+                    {"url": url, "title": "", "content": "", "error": "被安全验证拦截"},
+                    ensure_ascii=False,
+                )
+
+            # 🔥 提取文章标题（多种选择器）
+            title = ""
+            title_selectors = [
+                "h1",
+                ".article-title",
+                ".news-title",
+                ".title",
+                "[class*='title']",
+                "#title",
+            ]
+
+            for selector in title_selectors:
+                try:
+                    title_elem = await page.query_selector(selector)
+                    if title_elem:
+                        title_text = await title_elem.text_content()
+                        if title_text and len(title_text.strip()) > 5:  # 标题至少5个字符
+                            title = title_text.strip()
+                            logger.info(f"   📰 标题: {title[:50]}...")
+                            break
+                except Exception as e:
+                    logger.debug(f"   选择器失败: {selector}, 错误: {e}")
+                    continue
+
+            # 🔥 提取文章正文（多种选择器）
+            content_selectors = [
+                "article",
+                ".article-content",
+                ".news-content",
+                ".content",
+                "[class*='content']",
+                "#content",
+                ".article-body",
+                ".post-content",
+                "main",
+            ]
+
+            full_content = ""
+            for selector in content_selectors:
+                try:
+                    content_elem = await page.query_selector(selector)
+                    if content_elem:
+                        # 获取所有段落
+                        paragraphs = await content_elem.query_selector_all("p")
+                        if paragraphs and len(paragraphs) >= 3:  # 至少3个段落
+                            content_parts = []
+                            for p in paragraphs[:20]:  # 最多取前20段
+                                text = await p.text_content()
+                                if text and len(text.strip()) > 10:  # 每段至少10个字符
+                                    content_parts.append(text.strip())
+
+                            if content_parts:
+                                full_content = "\n\n".join(content_parts)
+                                logger.info(
+                                    f"   ✅ 使用选择器 '{selector}' 提取到 {len(content_parts)} 个段落"
+                                )
+                                break
+                except Exception as e:
+                    logger.debug(f"   选择器失败: {selector}, 错误: {e}")
+                    continue
+
+            # 如果上面的方法都失败，尝试直接获取body中的所有文本
+            if not full_content or len(full_content) < 100:
+                logger.warning("   ⚠️ 常规选择器失败，尝试备用方案")
+                try:
+                    # 🔥 使用JavaScript进行深度清理和提取
+                    body_text = await page.evaluate(
+                        """() => {
+                        // 克隆body节点
+                        const clones = document.body.cloneNode(true);
+
+                        // 移除不需要的元素
+                        const unwantedSelectors = [
+                            'script', 'style', 'nav', 'header', 'footer', 'aside',
+                            'iframe', 'noscript', 'meta', 'link', '[class*="ad"]',
+                            '[class*="advertisement"]', '[class*="sidebar"]',
+                            '[class*="comment"]', '[class*="share"]', '[class*="social"]',
+                            '[id*="ad"]', '[id*="advertisement"]'
+                        ];
+
+                        unwantedSelectors.forEach(selector => {
+                            const elements = clones.querySelectorAll(selector);
+                            elements.forEach(el => el.remove());
+                        });
+
+                        // 获取所有段落和标题
+                        const contentElements = clones.querySelectorAll('p, h1, h2, h3, h4, div, span');
+                        const texts = [];
+
+                        contentElements.forEach(el => {
+                            const text = el.textContent || el.innerText || '';
+                            const trimmed = text.trim();
+
+                            // 过滤掉太短或明显不是正文的内容
+                            if (trimmed.length > 20 &&
+                                !trimmed.includes('点击') &&
+                                !trimmed.includes('关注') &&
+                                !trimmed.includes('订阅') &&
+                                !trimmed.match(/^\\d+$/)) {
+                                texts.push(trimmed);
+                            }
+                        });
+
+                        // 去重并合并
+                        const uniqueTexts = [...new Set(texts)];
+
+                        if (uniqueTexts.length >= 3) {
+                            return uniqueTexts
+                                .slice(0, 30)  // 最多30段
+                                .join('\\n\\n');
+                        }
+                        return '';
+                    }"""
+                    )
+
+                    if body_text and len(body_text) > 100:
+                        full_content = body_text
+                        logger.info(f"   ✅ 备用方案提取到内容，长度: {len(body_text)}")
+                except Exception as e:
+                    logger.debug(f"   备用方案失败: {e}")
+
+            # 🔥 清理和规范化内容
+            if full_content:
+                # 移除多余的空白字符
+                full_content = re.sub(r"\n{3,}", "\n\n", full_content)
+                full_content = re.sub(r"[ \t]+", " ", full_content)  # 合并多余空格
+                full_content = re.sub(r"\n +", "\n", full_content)  # 移除行首空格
+                full_content = full_content.strip()
+
+                # 移除常见的无用文本
+                useless_patterns = [
+                    r"点击查看.*详情",
+                    r"更多内容请.*",
+                    r"责任编辑.*",
+                    r"版权声明.*",
+                    r"本文来源.*",
+                    r"转载请注明.*",
+                    r"免责声明.*",
+                    r"广告.*",
+                ]
+                for pattern in useless_patterns:
+                    full_content = re.sub(pattern, "", full_content, flags=re.IGNORECASE)
+
+            logger.info(f"✅ 文章内容获取完成，原始长度: {len(full_content)} 字符")
+
+            return json.dumps(
+                {
+                    "url": url,
+                    "title": title,
+                    "content": full_content,
+                    "content_length": len(full_content),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
+    except Exception as e:
+        logger.error(f"❌ 获取文章内容失败: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+
+        return json.dumps(
+            {"url": url, "title": "", "content": "", "error": str(e)}, ensure_ascii=False
+        )
+
+
+@server.tool()
+async def baidu_hot_search() -> str:
+    """获取百度热搜榜 - 使用 Playwright 浏览器自动化
+
+    Returns:
+        JSON 格式的热搜榜单（前50条）
+    """
+    logger.info("🔥 [百度热搜榜] 获取热搜榜单")
+
+    # 🔥 应用速率限制
+    await rate_limiter.acquire()
+
+    try:
+        # 百度热搜榜 URL
+        hot_url = "https://top.baidu.com/board?tab=realtime"
+
+        # 🔥 使用浏览器池获取页面（带随机 User-Agent）
+        random_user_agent = get_random_user_agent()
+        async with browser_pool.get_page(user_agent=random_user_agent) as page:
+            # 访问热搜榜页面
+            logger.info(f"   🌐 正在访问: {hot_url}")
+            await page.goto(hot_url, timeout=30000)
+
+            # ⚡ 移除所有延迟，直接提取
+
+            # 提取热搜榜
+            hot_items = []
+
+            # 使用 Playwright 查找热搜条目
+            items = await page.query_selector_all(".category-wrap_iQLoo.horizontal_1eKyQ")
+
+            logger.info(f"   🔍 找到 {len(items)} 个热搜条目")
+
+            for idx, item in enumerate(items[:50], 1):
+                try:
+                    # 提取标题
+                    title_elem = await item.query_selector(".c-single-text-ellipsis")
+                    title = ""
+                    if title_elem:
+                        title = await title_elem.text_content()
+                        title = title.strip() if title else ""
+
+                    # 提取热度
+                    hot_score_elem = await item.query_selector(".hot-index_1Bl1a")
+                    hot_score = ""
+                    if hot_score_elem:
+                        hot_score = await hot_score_elem.text_content()
+                        hot_score = hot_score.strip() if hot_score else ""
+
+                    # 提取链接
+                    link_elem = await item.query_selector("a")
+                    url = ""
+                    if link_elem:
+                        url = await link_elem.get_attribute("href")
+                        url = url or ""
+
+                    if title:
+                        hot_items.append(
+                            {
+                                "rank": idx,
+                                "title": title,
+                                "hot_score": hot_score,
+                                "url": url,
+                            }
+                        )
+
+                except Exception as e:
+                    logger.debug(f"解析热搜条目失败: {e}")
+                    continue
+
+        logger.info(f"✅ 热搜榜获取完成: {len(hot_items)} 条")
+
+        return json.dumps(
+            {"total": len(hot_items), "hot_items": hot_items},
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    except Exception as e:
+        logger.error(f"❌ 获取百度热搜失败: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+
+        return json.dumps(
+            {"total": 0, "hot_items": [], "error": str(e)},
+            ensure_ascii=False,
+        )
+
+
+# ========== 多搜索引擎工具 ==========
+
+# 初始化多搜索引擎
+multi_engine = get_multi_engine(browser_pool, rate_limiter)
+
+
+@server.tool()
+async def multi_search(
+    query: str,
+    engine: str = "auto",
+    num_results: int = 30,
+    search_type: str = "web",
+) -> str:
+    """多搜索引擎 - 支持百度、必应、搜狗等多个搜索引擎
+
+    Args:
+        query: 搜索关键词（如 "人工智能"、"科技新闻"）
+        engine: 搜索引擎选择 ("auto", "baidu", "bing", "sogou")
+               - auto: 随机选择引擎（推荐，增加成功率）
+               - baidu: 百度搜索
+               - bing: 必应搜索
+               - sogou: 搜狗搜索
+        num_results: 返回结果数量（默认 30）
+        search_type: 搜索类型 ("web" 网页搜索, "news" 新闻搜索)
+
+    Returns:
+        JSON 格式的搜索结果，包含引擎名称、标题、链接、摘要、来源等
+
+    Examples:
+        - multi_search("人工智能", "auto", 30, "web")  # 随机引擎搜索
+        - multi_search("科技新闻", "bing", 20, "news")  # 必应新闻搜索
+        - multi_search("股市行情", "sogou", 30, "web")  # 搜狗网页搜索
+    """
+    return await multi_engine.search(
+        query=query,
+        engine=engine,
+        num_results=num_results,
+        search_type=search_type,
+    )
+
+
+@server.tool()
+async def bing_search(
+    query: str,
+    num_results: int = 30,
+) -> str:
+    """必应搜索 - 使用微软必应搜索引擎
+
+    Args:
+        query: 搜索关键词（如 "人工智能"、"科技新闻"）
+        num_results: 返回结果数量（默认 30，建议 20-40）
+
+    Returns:
+        JSON 格式的搜索结果
+
+    Examples:
+        - bing_search("人工智能最新消息", 30)
+        - bing_search("Python编程教程", 20)
+    """
+    return await multi_engine.search(
+        query=query,
+        engine="bing",
+        num_results=num_results,
+        search_type="web",
+    )
+
+
+@server.tool()
+async def bing_news_search(
+    query: str,
+    num_results: int = 30,
+) -> str:
+    """必应新闻搜索 - 使用微软必应新闻搜索
+
+    Args:
+        query: 搜索关键词（如 "人工智能"、"科技"）
+        num_results: 返回结果数量（默认 30，建议 20-50）
+
+    Returns:
+        JSON 格式的新闻搜索结果
+
+    Examples:
+        - bing_news_search("科技", 30)
+        - bing_news_search("人工智能", 40)
+    """
+    return await multi_engine.search(
+        query=query,
+        engine="bing",
+        num_results=num_results,
+        search_type="news",
+    )
+
+
+@server.tool()
+async def sogou_search(
+    query: str,
+    num_results: int = 30,
+) -> str:
+    """搜狗搜索 - 使用搜狗搜索引擎
+
+    Args:
+        query: 搜索关键词（如 "人工智能"、"科技新闻"）
+        num_results: 返回结果数量（默认 30，建议 20-40）
+
+    Returns:
+        JSON 格式的搜索结果
+
+    Examples:
+        - sogou_search("人工智能最新消息", 30)
+        - sogou_search("Python编程教程", 20)
+    """
+    return await multi_engine.search(
+        query=query,
+        engine="sogou",
+        num_results=num_results,
+        search_type="web",
+    )
+
+
+@server.tool()
+async def sogou_news_search(
+    query: str,
+    num_results: int = 30,
+) -> str:
+    """搜狗新闻搜索 - 使用搜狗新闻搜索
+
+    Args:
+        query: 搜索关键词（如 "人工智能"、"科技"）
+        num_results: 返回结果数量（默认 30，建议 20-50）
+
+    Returns:
+        JSON 格式的新闻搜索结果
+
+    Examples:
+        - sogou_news_search("科技", 30)
+        - sogou_news_search("人工智能", 40)
+    """
+    return await multi_engine.search(
+        query=query,
+        engine="sogou",
+        num_results=num_results,
+        search_type="news",
+    )
+
+
+if __name__ == "__main__":
+    logger.info("🚀 百度搜索 MCP Server 启动")
+    server.run()

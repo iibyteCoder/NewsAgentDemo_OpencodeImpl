@@ -1,0 +1,13 @@
+[project]
+name = "opencodetest-1"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "loguru",
+    "lxml>=6.0.2",
+    "mcp",
+    "playwright",
+    "pydantic-settings>=2.0.0",
+]
