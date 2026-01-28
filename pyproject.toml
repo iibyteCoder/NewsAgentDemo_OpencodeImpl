@@ -5,6 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "httpx>=0.27.0",
     "loguru",
     "lxml>=6.0.2",
     "mcp",

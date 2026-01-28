@@ -17,7 +17,9 @@
       "Bash(iconv:*)",
       "Bash(git remote add:*)",
       "Bash(git add:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(git commit:*)",
+      "Bash(tree:*)"
     ]
   }
 }

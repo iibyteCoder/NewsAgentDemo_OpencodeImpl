@@ -5,6 +5,16 @@
       "type": "local",
       "command": [".venv/Scripts/python.exe", "-m", "mcp_server.web_browser.main"],
       "enabled": true
+    },
+    "downloader": {
+      "type": "local",
+      "command": [".venv/Scripts/python.exe", "-m", "mcp_server.downloader.main"],
+      "enabled": true
+    },
+    "news_storage": {
+      "type": "local",
+      "command": [".venv/Scripts/python.exe", "-m", "mcp_server.news_storage.main"],
+      "enabled": true
     }
   },
   "agent": {
@@ -20,7 +30,9 @@
         "webfetch": false,
         "read": true,
         "grep": true,
-        "web-browser*": true
+        "web-browser*": true,
+        "downloader*": true,
+        "news-storage*": true
       },
       "permission": {
         "bash": {

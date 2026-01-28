@@ -1,7 +1,7 @@
 """搜索引擎基类 - 定义统一的接口"""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 from urllib.parse import urlparse
 
@@ -23,6 +23,21 @@ class SearchResult:
     summary: str = ""
     source: str = ""
     time: str = ""
+
+
+@dataclass
+class SearchResultWithStatus:
+    """带状态的搜索结果"""
+    results: List[SearchResult] = field(default_factory=list)
+    blocked: bool = False
+    block_reason: str = ""
+
+    def __len__(self):
+        return len(self.results)
+
+    def is_empty(self):
+        """是否为空（包括被拦截的情况）"""
+        return self.blocked or len(self.results) == 0
 
 
 class BaseEngine(ABC):
