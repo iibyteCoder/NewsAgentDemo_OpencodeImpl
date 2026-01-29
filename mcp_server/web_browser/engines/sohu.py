@@ -46,6 +46,41 @@ class SohuEngine(BaseEngine):
             logger.warning("   ⚠️ 搜狐新闻页面加载超时")
             return []
 
+        # 搜狐使用滚动加载，需要滚动页面来加载更多结果
+        max_scroll_attempts = 10  # 最大滚动次数
+        scroll_pause_time = 1500  # 每次滚动后等待时间（毫秒）
+
+        for attempt in range(max_scroll_attempts):
+            # 检查当前已加载的结果数量
+            current_count = await page.evaluate("""() => {
+                return document.querySelectorAll('div.cards-small-img').length;
+            }""")
+
+            logger.info(f"   📜 滚动加载 (第{attempt + 1}次): 已加载 {current_count} 条结果")
+
+            # 如果已获取足够结果，停止滚动
+            if current_count >= num_results:
+                logger.info(f"   ✅ 已获取足够结果 ({current_count} 条)")
+                break
+
+            # 滚动到页面底部
+            await page.evaluate("""() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            }""")
+
+            # 等待新数据加载
+            await page.wait_for_timeout(scroll_pause_time)
+
+            # 检查是否有新数据加载
+            new_count = await page.evaluate("""() => {
+                return document.querySelectorAll('div.cards-small-img').length;
+            }""")
+
+            # 如果没有新数据，说明已经到底了
+            if new_count == current_count:
+                logger.info("   ✅ 已到达页面底部")
+                break
+
         # 解析结果
         raw_results = await page.evaluate("""() => {
             const results = [];

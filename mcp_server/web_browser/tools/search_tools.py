@@ -101,12 +101,14 @@ async def _execute_search(
     engine = _engine_factory.get_engine(engine_id)
     if not engine:
         return json.dumps(
-            {"error": f"搜索引擎 {engine_id} 不可用"},
-            "engine": engine_id,
-            "engine_name": engine_id,
-            "query": query,
-            "total": 0,
-            "results": [],
+            {
+                "error": f"搜索引擎 {engine_id} 不可用",
+                "engine": engine_id,
+                "engine_name": engine_id,
+                "query": query,
+                "total": 0,
+                "results": [],
+            },
             ensure_ascii=False,
         )
 
@@ -119,7 +121,7 @@ async def _execute_search(
 
     try:
         user_agent = get_random_user_agent()
-        async with _browser_pool.get_page(user_agent=user_agent) as page:
+        async with _browser_pool.get_page(user_agent=user_agent, engine=engine) as page:
             # 先访问页面
             await page.goto(search_url, timeout=30000)
 
@@ -532,40 +534,37 @@ async def _extract_title(page) -> str:
 
 
 async def _extract_content(page) -> str:
-    """提取文章正文"""
-    content_selectors = [
-        "article",
-        ".article-content",
-        ".news-content",
-        ".content",
-        "[class*='content']",
-        "#content",
-        ".article-body",
-        ".post-content",
-        "main",
-    ]
+    """提取文章正文（使用 trafilatura 成熟算法）"""
+    try:
+        # 获取页面HTML
+        html = await page.content()
 
-    for selector in content_selectors:
-        try:
-            content_elem = await page.query_selector(selector)
-            if content_elem:
-                paragraphs = await content_elem.query_selector_all("p")
-                if paragraphs and len(paragraphs) >= 3:
-                    content_parts = []
-                    for p in paragraphs[:20]:
-                        text = await p.text_content()
-                        if text and len(text.strip()) > 10:
-                            content_parts.append(text.strip())
+        # 使用 trafilatura 提取内容
+        import trafilatura
 
-                    if content_parts:
-                        full_content = "\n\n".join(content_parts)
-                        logger.info(f"   ✅ 提取到 {len(content_parts)} 个段落")
-                        return full_content
-        except Exception:
-            continue
+        # 提取主要内容
+        content = trafilatura.extract(
+            html,
+            include_comments=False,
+            include_tables=True,
+            no_fallback=False,
+            favor_precision=False,
+            favor_recall=True,
+        )
 
-    # 备用方案：使用 JavaScript 提取
-    return await _extract_content_fallback(page)
+        if content and len(content.strip()) > 100:
+            logger.info(f"   ✅ trafilatura 提取成功，长度: {len(content)} 字符")
+            return content.strip()
+        else:
+            logger.warning("   ⚠️ trafilatura 提取内容过少，使用备用方案")
+            return await _extract_content_fallback(page)
+
+    except ImportError:
+        logger.warning("   ⚠️ trafilatura 未安装，使用备用方案")
+        return await _extract_content_fallback(page)
+    except Exception as e:
+        logger.warning(f"   ⚠️ trafilatura 提取失败: {e}，使用备用方案")
+        return await _extract_content_fallback(page)
 
 
 async def _extract_content_fallback(page) -> str:
@@ -647,7 +646,12 @@ def _clean_content(content: str) -> str:
 
 
 async def _extract_images(page, base_url: str) -> list[dict]:
-    """提取文章中的图片链接
+    """提取文章中的图片链接（使用专业工具）
+
+    优先级:
+    1. newspaper3k - 专门的新闻文章提取库
+    2. trafilatura - 成熟的内容提取库
+    3. JavaScript 备用方案
 
     Args:
         page: Playwright页面对象
@@ -656,6 +660,100 @@ async def _extract_images(page, base_url: str) -> list[dict]:
     Returns:
         图片信息列表，每个图片包含 url, alt, width, height
     """
+    html = await page.content()
+
+    # 方法1: 尝试使用 newspaper3k
+    try:
+        from newspaper import Article, Config
+
+        # 配置 newspaper3k
+        config = Config()
+        config.browser_user_agent = "Mozilla/5.0"
+        config.fetch_images = False  # 不下载图片，只提取URL
+        config.request_timeout = 10
+
+        article = Article(url=base_url, config=config)
+        article.set_html(html)
+        article.parse()
+
+        # newspaper3k 提取的图片列表
+        if article.images and len(article.images) > 0:
+            # 过滤掉 base64 图片、小图标等无关图片
+            valid_images = []
+            for url in article.images:
+                # 跳过 base64 编码的图片
+                if url.startswith("data:image"):
+                    continue
+                # 跳过明显的小图标
+                if any(keyword in url.lower() for keyword in ["icon", "logo", "pixel", "tracking", "avatar"]):
+                    continue
+                # 跳过太短的URL
+                if len(url) < 20:
+                    continue
+                valid_images.append(url)
+
+            if valid_images:
+                logger.info(f"   ✅ newspaper3k 提取到 {len(valid_images)} 个有效图片 (原始{len(article.images)}个)")
+                return [
+                    {"index": i + 1, "url": url, "alt": "", "width": 0, "height": 0}
+                    for i, url in enumerate(valid_images)
+                ]
+            else:
+                logger.info("   ⚠️ newspaper3k 提取的图片都被过滤掉了")
+
+        elif article.top_img:
+            # 检查主图是否有效
+            top_img = article.top_img
+            if (
+                not top_img.startswith("data:image")
+                and len(top_img) >= 20
+                and not any(keyword in top_img.lower() for keyword in ["icon", "logo", "pixel"])
+            ):
+                logger.info(f"   ✅ newspaper3k 提取到主图: {top_img}")
+                return [{"index": 1, "url": top_img, "alt": "", "width": 0, "height": 0}]
+
+        logger.info("   ⚠️ newspaper3k 未找到有效图片，尝试下一个方法")
+
+    except ImportError:
+        logger.info("   ⚠️ newspaper3k 未安装，尝试下一个方法")
+    except Exception as e:
+        logger.info(f"   ⚠️ newspaper3k 提取失败: {e}，尝试下一个方法")
+
+    # 方法2: 使用 trafilatura
+    try:
+        import trafilatura
+
+        # 使用 JSON 格式提取，包含图片信息
+        result = trafilatura.extract(
+            html,
+            url=base_url,
+            output_format="json",
+            include_images=True,
+            include_comments=False,
+            with_metadata=False,
+        )
+
+        if result:
+            import json
+
+            data = json.loads(result)
+            if "image" in data and data["image"]:
+                # 处理单个主图
+                image_url = data["image"]
+                logger.info(f"   ✅ trafilatura 提取到主图: {image_url}")
+                return [{"index": 1, "url": image_url, "alt": "", "width": 0, "height": 0}]
+
+        logger.info("   ⚠️ trafilatura 未找到图片，使用备用方案")
+
+    except Exception as e:
+        logger.info(f"   ⚠️ trafilatura 图片提取失败: {e}，使用备用方案")
+
+    # 方法3: 使用 JavaScript 备用方案
+    return await _extract_images_fallback(page, base_url)
+
+
+async def _extract_images_fallback(page, base_url: str) -> list[dict]:
+    """备用方案：使用 JavaScript 提取图片"""
     try:
         images = await page.evaluate(
             """(baseUrl) => {
@@ -664,7 +762,7 @@ async def _extract_images(page, base_url: str) -> list[dict]:
 
             imgElements.forEach((img, idx) => {
                 const src = img.src || img.getAttribute('data-src');
-                if (src) {
+                if (src && src.length > 10) {  // 过滤掉过短的URL
                     // 处理相对路径
                     let fullUrl = src;
                     if (src.startsWith('//')) {
@@ -684,14 +782,21 @@ async def _extract_images(page, base_url: str) -> list[dict]:
                         }
                     }
 
-                    images.push({
-                        index: idx + 1,
-                        url: fullUrl,
-                        alt: img.alt || '',
-                        title: img.title || '',
-                        width: img.naturalWidth || img.width || 0,
-                        height: img.naturalHeight || img.height || 0
-                    });
+                    // 过滤掉跟踪像素和小图标
+                    if (fullUrl.includes('.') &&
+                        !fullUrl.includes('pixel') &&
+                        !fullUrl.includes('tracking') &&
+                        !fullUrl.includes('icon') &&
+                        img.width > 50 && img.height > 50) {
+                        images.push({
+                            index: idx + 1,
+                            url: fullUrl,
+                            alt: img.alt || '',
+                            title: img.title || '',
+                            width: img.naturalWidth || img.width || 0,
+                            height: img.naturalHeight || img.height || 0
+                        });
+                    }
                 }
             });
 
@@ -700,7 +805,7 @@ async def _extract_images(page, base_url: str) -> list[dict]:
             base_url,
         )
 
-        logger.info(f"   🖼️ 找到 {len(images)} 个图片")
+        logger.info(f"   🖼️ 备用方案找到 {len(images)} 个图片")
         return images
 
     except Exception as e:

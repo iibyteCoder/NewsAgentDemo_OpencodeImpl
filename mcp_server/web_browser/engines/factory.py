@@ -36,8 +36,19 @@ class EngineFactory:
         "sohu": SohuEngine,
     }
 
-    # 引擎速度优先级（根据测试数据）
-    _SPEED_PRIORITY = ["baidu", "sogou", "google", "360", "bing"]
+    # 引擎速度优先级（根据测试数据，越快越靠前）
+    _SPEED_PRIORITY = [
+        "baidu",
+        "sogou",
+        "toutiao",
+        "tencent",
+        "360",
+        "wangyi",
+        "sina",
+        "google",
+        "sohu",
+        "bing",
+    ]
 
     # 禁用时间配置（秒）
     BAN_DURATION_BASE = 300  # 基础禁用时间：5分钟

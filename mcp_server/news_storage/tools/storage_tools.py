@@ -22,6 +22,7 @@ async def save_news_tool(
     html_content: str = "",
     keywords: str = "[]",
     images: str = "[]",
+    local_images: str = "[]",
     tags: str = "[]",
 ) -> str:
     """保存单条新闻 - 💾 自动去重（基于URL）
@@ -30,7 +31,7 @@ async def save_news_tool(
     - 保存新闻的完整信息到SQLite数据库
     - 自动检测URL是否已存在，存在则更新
     - 支持保存标题、摘要、来源、时间、内容等完整信息
-    - 支持关键词、图片URL（多个）、标签等扩展信息
+    - 支持关键词、图片URL（多个）、本地图片路径（多个）、标签等扩展信息
     - 支持事件名称归类
 
     Args:
@@ -45,6 +46,7 @@ async def save_news_tool(
         html_content: HTML内容（原文）（可选）
         keywords: 关键词JSON数组（可选，如 '["AI", "技术"]'）
         images: 图片URL JSON数组（可选，支持多个图片）
+        local_images: 本地图片路径 JSON数组（可选，支持多个）
         tags: 标签 JSON数组（可选）
 
     Returns:
@@ -73,6 +75,7 @@ async def save_news_tool(
         ...     html_content="<p>HTML原文</p>",
         ...     keywords='["AI", "技术"]',
         ...     images='["https://example.com/img1.jpg", "https://example.com/img2.jpg"]',
+        ...     local_images='["./report/images/img1.jpg", "./report/images/img2.jpg"]',
         ...     tags='["科技", "前沿"]'
         ... )
     """
@@ -82,6 +85,7 @@ async def save_news_tool(
         # 解析JSON字段
         keywords_list = json.loads(keywords) if keywords else []
         images_list = json.loads(images) if images else []
+        local_images_list = json.loads(local_images) if local_images else []
         tags_list = json.loads(tags) if tags else []
 
         # 创建新闻对象
@@ -97,6 +101,7 @@ async def save_news_tool(
             html_content=html_content,
             keywords=keywords_list,
             images=images_list,
+            local_images=local_images_list,
             tags=tags_list,
         )
 
@@ -178,6 +183,7 @@ async def save_news_batch_tool(news_list: str) -> str:
                 html_content=item.get("html_content", ""),
                 keywords=item.get("keywords", []),
                 images=item.get("images", []),
+                local_images=item.get("local_images", []),
                 tags=item.get("tags", []),
             )
             news_items.append(news)
@@ -248,7 +254,7 @@ async def get_news_by_url_tool(url: str) -> str:
 
 
 async def search_news_tool(
-    keyword: Optional[str] = None,
+    search: Optional[str] = None,
     source: Optional[str] = None,
     event_name: Optional[str] = None,
     start_date: Optional[str] = None,
@@ -257,18 +263,19 @@ async def search_news_tool(
     limit: int = 100,
     offset: int = 0,
 ) -> str:
-    """搜索新闻 - 🔎 支持多条件筛选
+    """搜索新闻 - 🔎 智能搜索，一个参数搞定所有
 
-    功能：
-    - 根据关键词模糊搜索（标题、事件名称、摘要、内容）
-    - 按来源筛选
-    - 按事件名称精确筛选（查找同一事件的所有新闻）
-    - 按日期范围筛选
-    - 按标签筛选（支持多标签）
-    - 支持分页
+    【核心特性】
+    - 自动分词：多个空格分隔的词会被分别搜索
+    - 全字段匹配：搜索标题、摘要、keywords字段、内容
+    - 宽松匹配：只要匹配任意一个词就返回该新闻（OR关系）
+    - 结果最大化：尽可能多返回相关内容
 
     Args:
-        keyword: 搜索关键词（可选，模糊匹配标题、事件名称、摘要、内容）
+        search: 搜索词（可选，支持多个词用空格分隔）
+            - 单个词："欧冠"
+            - 多个词："皇马 巴黎圣日耳曼 淘汰赛"
+            - 系统会自动分词，每个词独立搜索所有字段
         source: 来源筛选（可选，如"新华网"）
         event_name: 事件名称精确筛选（可选）
         start_date: 开始日期（可选，ISO格式）
@@ -285,30 +292,44 @@ async def search_news_tool(
         - filters: 使用的筛选条件
 
     Examples:
-        >>> # 关键词搜索（模糊匹配标题和事件名称）
-        >>> search_news_tool(keyword="AI", limit=10)
-        >>> # 按来源搜索
-        >>> search_news_tool(source="新华网", limit=20)
-        >>> # 按事件名称精确搜索
-        >>> search_news_tool(event_name="2026年AI技术突破事件")
-        >>> # 组合搜索
+        >>> # 【最简单】单个词搜索
+        >>> search_news_tool(search="欧冠")
+
+        >>> # 【常用】多个词搜索（自动分词，OR关系）
+        >>> search_news_tool(search="皇马 巴黎圣日耳曼 淘汰赛 恢复能力")
+
+        >>> # 【精准】按来源筛选
+        >>> search_news_tool(search="AI", source="科技日报")
+
+        >>> # 【专业】组合筛选
         >>> search_news_tool(
-        ...     keyword="技术",
+        ...     search="AI 技术 突破",
         ...     source="科技日报",
         ...     event_name="2026年AI技术突破事件",
-        ...     tags='["科技", "前沿"]',
-        ...     limit=50
+        ...     start_date="2026-01-01"
+        ... )
+
+        >>> # 【高级】按标签筛选
+        >>> search_news_tool(
+        ...     search="欧冠",
+        ...     tags='["体育", "足球"]'
         ... )
     """
     try:
         db = get_database()
+
+        # 自动分词：按空格分割搜索词
+        search_terms = None
+        if search:
+            # 去除首尾空格，按空格分割，过滤空字符串
+            search_terms = [term.strip() for term in search.split() if term.strip()]
 
         # 解析标签
         tags_list = json.loads(tags) if tags else None
 
         # 构建过滤器
         search_filter = SearchFilter(
-            keyword=keyword,
+            search_terms=search_terms,
             source=source,
             event_name=event_name,
             start_date=start_date,
@@ -326,7 +347,8 @@ async def search_news_tool(
             "count": len(results),
             "results": [news.to_dict() for news in results],
             "filters": {
-                "keyword": keyword,
+                "search": search,
+                "search_terms": search_terms,
                 "source": source,
                 "event_name": event_name,
                 "start_date": start_date,

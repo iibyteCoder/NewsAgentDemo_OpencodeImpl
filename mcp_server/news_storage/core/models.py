@@ -29,6 +29,7 @@ class NewsItem:
     # 扩展信息
     keywords: List[str] = field(default_factory=list)  # 关键词列表
     images: List[str] = field(default_factory=list)  # 图片URL列表（支持多个）
+    local_images: List[str] = field(default_factory=list)  # 本地图片路径列表（下载后）
     tags: List[str] = field(default_factory=list)  # 标签
 
     # 元数据
@@ -49,6 +50,7 @@ class NewsItem:
             "html_content": self.html_content,
             "keywords": json.dumps(self.keywords, ensure_ascii=False),
             "images": json.dumps(self.images, ensure_ascii=False),
+            "local_images": json.dumps(self.local_images, ensure_ascii=False),
             "tags": json.dumps(self.tags, ensure_ascii=False),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -69,6 +71,7 @@ class NewsItem:
             html_content=data.get("html_content", ""),
             keywords=json.loads(data.get("keywords", "[]")),
             images=json.loads(data.get("images", "[]")),
+            local_images=json.loads(data.get("local_images", "[]")),
             tags=json.loads(data.get("tags", "[]")),
             created_at=data.get("created_at", datetime.now().isoformat()),
             updated_at=data.get("updated_at", datetime.now().isoformat()),
@@ -90,6 +93,7 @@ class NewsItem:
             html_content,
             keywords,
             images,
+            local_images,
             tags,
             created_at,
             updated_at,
@@ -107,6 +111,7 @@ class NewsItem:
             html_content=html_content or "",
             keywords=json.loads(keywords) if keywords else [],
             images=json.loads(images) if images else [],
+            local_images=json.loads(local_images) if local_images else [],
             tags=json.loads(tags) if tags else [],
             created_at=created_at,
             updated_at=updated_at,
@@ -115,9 +120,15 @@ class NewsItem:
 
 @dataclass
 class SearchFilter:
-    """搜索过滤器"""
+    """搜索过滤器
 
-    keyword: Optional[str] = None  # 关键词搜索
+    搜索逻辑：
+    - search_terms: 每个词独立搜索（标题 OR 摘要 OR keywords字段 OR 内容）
+    - 多个词之间是 OR 关系（匹配任意一个即可）
+    - 所有字段都用模糊匹配（LIKE）
+    """
+
+    search_terms: Optional[List[str]] = None  # 搜索词列表（自动分词）
     source: Optional[str] = None  # 来源筛选
     event_name: Optional[str] = None  # 事件名称筛选
     start_date: Optional[str] = None  # 开始日期

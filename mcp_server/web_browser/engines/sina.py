@@ -1,6 +1,7 @@
 """新浪新闻搜索引擎"""
 
 from typing import List
+from urllib.parse import quote
 
 from loguru import logger
 from playwright.async_api import Page
@@ -14,10 +15,20 @@ class SinaEngine(BaseEngine):
     def __init__(self):
         config = EngineConfig(
             name="新浪新闻",
-            search_url="https://search.sina.com.cn/?q={query}",
-            news_url="https://news.sina.com.cn/roll/index.d.html?keyword={query}",
+            search_url="https://search.sina.com.cn/",
+            news_url="https://search.sina.com.cn/",
         )
         super().__init__(config)
+
+    def get_resource_block_list(self) -> List[str]:
+        """新浪需要保留样式表"""
+        return ["image", "media"]
+
+    def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
+        """构建搜索URL"""
+        encoded_query = quote(query)
+        # 新浪搜索使用 q 参数，并添加 c=news 指定新闻搜索
+        return f"https://search.sina.com.cn/?q={encoded_query}&c=news&from=channel&ie=utf-8"
 
     async def search(
         self,
@@ -34,41 +45,52 @@ class SinaEngine(BaseEngine):
 
         # 等待页面加载
         try:
-            await page.wait_for_selector("div.blkContainer_01, dd, li.r", timeout=5000)
+            await page.wait_for_selector("div#result", timeout=15000)
+            await page.wait_for_timeout(2000)
         except Exception:
-            logger.warning("   ⚠️ 新浪新闻页面加载超时")
-            return []
+            logger.warning("   ⚠️ 新浪新闻页面加载超时，但继续尝试解析")
 
         # 解析结果
         raw_results = await page.evaluate("""() => {
             const results = [];
-            const newsItems = document.querySelectorAll('dd, li.r, div.news-item');
+            const newsItems = document.querySelectorAll('div.box-result');
 
             newsItems.forEach(item => {
                 try {
-                    const linkElem = item.querySelector('a');
-                    if (!linkElem) return;
+                    // 提取标题和链接
+                    const titleElem = item.querySelector('h2 a');
+                    if (!titleElem) return;
 
-                    const title = linkElem.innerText?.trim() || '';
-                    let url = linkElem.getAttribute('href') || '';
+                    const title = titleElem.innerText ? titleElem.innerText.trim() : '';
+                    const url = titleElem.getAttribute('href') || '';
 
                     if (!title || !url) return;
 
                     // 提取摘要
-                    const summaryElem = item.querySelector('p, div.summary');
-                    const summary = summaryElem ? summaryElem.innerText?.trim() || '' : '';
+                    const summaryElem = item.querySelector('p.content');
+                    const summary = summaryElem && summaryElem.innerText ? summaryElem.innerText.trim() : '';
 
-                    // 提取来源
-                    const sourceElem = item.querySelector('span.source, span.fgray, cite');
-                    const source = sourceElem ? sourceElem.innerText?.trim() || '' : '新浪新闻';
+                    // 提取来源和时间（在 span.fgray_time 中）
+                    const timeElem = item.querySelector('span.fgray_time');
+                    let source = '';
+                    let time = '';
 
-                    // 提取时间
-                    const timeElem = item.querySelector('span.date, span.fgray, span.time');
-                    const time = timeElem ? timeElem.innerText?.trim() || '' : '';
+                    if (timeElem) {
+                        const timeText = timeElem.innerText ? timeElem.innerText.trim() : '';
+                        // 格式通常是 "来源   时间" 或 "来源\\n时间"，用多个空格或换行分隔
+                        const parts = timeText.split(/\\s+/);
+                        if (parts.length >= 2) {
+                            // 第一部分是来源，最后部分是时间
+                            source = parts[0];
+                            time = parts[parts.length - 1];
+                        } else {
+                            time = timeText;
+                        }
+                    }
 
                     results.push({title, url, summary, source, time});
                 } catch (e) {
-                    // 忽略单个结果的解析错误
+                    // 忽略解析错误
                 }
             });
 

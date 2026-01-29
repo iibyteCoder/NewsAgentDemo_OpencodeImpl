@@ -52,6 +52,17 @@ class BaseEngine(ABC):
         """引擎ID（用于配置等）"""
         return self.__class__.__name__.replace("Engine", "").lower()
 
+    def get_resource_block_list(self) -> List[str]:
+        """获取需要拦截的资源类型列表
+
+        子类可以覆盖此方法来自定义拦截策略
+
+        Returns:
+            List[str]: 资源类型列表，可选值: "image", "font", "media", "stylesheet", "script"
+        """
+        # 默认策略：只拦截图片、字体、媒体
+        return ["image", "font", "media"]
+
     @abstractmethod
     async def search(
         self,

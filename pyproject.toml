@@ -9,6 +9,8 @@ dependencies = [
     "loguru",
     "lxml>=6.0.2",
     "mcp",
+    "newspaper3k",
     "playwright",
     "pydantic-settings>=2.0.0",
+    "trafilatura",
 ]

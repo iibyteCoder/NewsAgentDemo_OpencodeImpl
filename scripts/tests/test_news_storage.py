@@ -97,13 +97,18 @@ async def test_basic_operations():
     for news in recent[:3]:
         logger.info(f"   - {news.title} ({news.source})")
 
-    # 测试6: 搜索功能
+    # 测试6: 搜索功能（包括模糊查询）
     logger.info("\n6️⃣ 搜索功能测试...")
 
-    # 关键词搜索
+    # 关键词搜索（模糊匹配标题、事件名称、摘要、内容）
     filter1 = SearchFilter(keyword="AI", limit=10)
     results1 = db.search_news(filter1)
-    logger.info(f"   关键词'AI': 找到 {len(results1)} 条")
+    logger.info(f"   关键词'AI'（模糊匹配标题和事件名称）: 找到 {len(results1)} 条")
+
+    # 关键词搜索（模糊匹配事件名称）
+    filter_event = SearchFilter(keyword="AI技术", limit=10)
+    results_event = db.search_news(filter_event)
+    logger.info(f"   关键词'AI技术'（模糊匹配事件名称）: 找到 {len(results_event)} 条")
 
     # 按来源筛选
     filter2 = SearchFilter(source="科技日报", limit=10)
@@ -115,10 +120,10 @@ async def test_basic_operations():
     results3 = db.search_news(filter3)
     logger.info(f"   标签'科技': 找到 {len(results3)} 条")
 
-    # 按事件名称筛选
+    # 按事件名称精确筛选
     filter4 = SearchFilter(event_name="2026年AI技术突破事件", limit=10)
     results4 = db.search_news(filter4)
-    logger.info(f"   事件名称'2026年AI技术突破事件': 找到 {len(results4)} 条")
+    logger.info(f"   事件名称'2026年AI技术突破事件'（精确）: 找到 {len(results4)} 条")
 
     # 测试7: 统计信息
     logger.info("\n7️⃣ 获取统计信息...")
@@ -138,10 +143,65 @@ async def test_basic_operations():
     logger.info("\n✅ 基本操作测试完成！")
 
 
+async def test_event_name_operations():
+    """测试事件名称操作"""
+    logger.info("\n" + "=" * 50)
+    logger.info("测试2: 事件名称操作")
+    logger.info("=" * 50)
+
+    db = get_database("./data/test_news.db")
+
+    # 创建一些没有事件名称的新闻
+    logger.info("\n1️⃣ 创建没有事件名称的新闻...")
+    test_urls = []
+    for i in range(3):
+        news = NewsItem(
+            title=f"测试新闻 {i}",
+            url=f"https://example.com/test/event-{i}",
+            summary=f"这是第 {i} 条测试新闻",
+            source="测试来源",
+            keywords=["测试"],
+            event_name="",  # 初始为空
+        )
+        db.save_news(news)
+        test_urls.append(news.url)
+
+    logger.info(f"   创建了 {len(test_urls)} 条新闻（无事件名称）")
+
+    # 测试更新单条新闻的事件名称
+    logger.info("\n2️⃣ 更新单条新闻的事件名称...")
+    success = db.update_event_name(
+        test_urls[0],
+        "测试事件A"
+    )
+    logger.info(f"   更新结果: {'成功' if success else '失败'}")
+
+    # 验证更新
+    updated_news = db.get_news_by_url(test_urls[0])
+    logger.info(f"   事件名称: {updated_news.event_name}")
+
+    # 测试批量更新事件名称
+    logger.info("\n3️⃣ 批量更新事件名称...")
+    stats = db.batch_update_event_name(
+        test_urls,
+        "测试事件统一名称"
+    )
+    logger.info(f"   更新: {stats['updated']}")
+    logger.info(f"   失败: {stats['failed']}")
+
+    # 验证批量更新
+    logger.info("\n4️⃣ 验证批量更新结果...")
+    for url in test_urls:
+        news = db.get_news_by_url(url)
+        logger.info(f"   {url}: {news.event_name}")
+
+    logger.info("\n✅ 事件名称操作测试完成！")
+
+
 async def test_batch_operations():
     """测试批量操作"""
     logger.info("\n" + "=" * 50)
-    logger.info("测试2: 批量操作")
+    logger.info("测试3: 批量操作")
     logger.info("=" * 50)
 
     db = get_database("./data/test_news.db")
@@ -173,86 +233,14 @@ async def test_batch_operations():
     logger.info("\n✅ 批量操作测试完成！")
 
 
-async def test_search_features():
-    """测试搜索功能"""
-    logger.info("\n" + "=" * 50)
-    logger.info("测试3: 高级搜索功能")
-    logger.info("=" * 50)
-
-    db = get_database("./data/test_news.db")
-
-    # 创建不同类型的新闻
-    logger.info("\n1️⃣ 创建测试数据...")
-    test_data = [
-        NewsItem(
-            title="Python 3.13发布",
-            url="https://example.com/tech/python-313",
-            summary="Python 3.13正式发布，性能大幅提升",
-            source="技术社区",
-            keywords=["Python", "编程"],
-            tags=["技术", "编程语言"],
-        ),
-        NewsItem(
-            title="JavaScript框架对比",
-            url="https://example.com/tech/js-frameworks",
-            summary="React vs Vue vs Angular，哪个更好？",
-            source="前端周刊",
-            keywords=["JavaScript", "前端"],
-            tags=["技术", "前端开发"],
-        ),
-        NewsItem(
-            title="Rust语言入门指南",
-            url="https://example.com/tech/rust-guide",
-            summary="Rust语言详细教程，从零开始",
-            source="技术社区",
-            keywords=["Rust", "编程"],
-            tags=["技术", "系统编程"],
-        ),
-    ]
-
-    for news in test_data:
-        db.save_news(news)
-
-    # 测试各种搜索
-    logger.info("\n2️⃣ 测试关键词搜索...")
-    filters = [
-        SearchFilter(keyword="Python", limit=10),
-        SearchFilter(keyword="JavaScript", limit=10),
-        SearchFilter(keyword="性能", limit=10),
-    ]
-
-    for f in filters:
-        results = db.search_news(f)
-        logger.info(f"   关键词'{f.keyword}': {len(results)} 条")
-
-    logger.info("\n3️⃣ 测试来源筛选...")
-    filter_source = SearchFilter(source="技术社区", limit=10)
-    results = db.search_news(filter_source)
-    logger.info(f"   来源'技术社区': {len(results)} 条")
-
-    logger.info("\n4️⃣ 测试标签筛选...")
-    filter_tags = SearchFilter(tags=["技术"], limit=10)
-    results = db.search_news(filter_tags)
-    logger.info(f"   标签'技术': {len(results)} 条")
-
-    logger.info("\n5️⃣ 测试组合搜索...")
-    filter_combo = SearchFilter(
-        keyword="编程", source="技术社区", limit=10
-    )
-    results = db.search_news(filter_combo)
-    logger.info(f"   关键词'编程' + 来源'技术社区': {len(results)} 条")
-
-    logger.info("\n✅ 搜索功能测试完成！")
-
-
 async def main():
     """运行所有测试"""
     logger.info("🚀 News Storage 测试开始\n")
 
     try:
         await test_basic_operations()
+        await test_event_name_operations()
         await test_batch_operations()
-        await test_search_features()
 
         logger.info("\n" + "=" * 50)
         logger.info("🎉 所有测试通过！")

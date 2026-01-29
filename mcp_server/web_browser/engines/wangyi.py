@@ -20,6 +20,10 @@ class WangyiEngine(BaseEngine):
         )
         super().__init__(config)
 
+    def get_resource_block_list(self) -> List[str]:
+        """网易可以拦截更多资源以加快速度"""
+        return []
+
     def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
         """构建搜索URL"""
         encoded_query = quote(query)

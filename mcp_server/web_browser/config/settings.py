@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         ge=60,
     )
     headless: bool = Field(
-        default=False,
+        default=True,
         description="是否使用无头模式",
     )
 
@@ -98,7 +98,18 @@ class Settings(BaseSettings):
 
     # ========== 搜索引擎配置 ==========
     enabled_engines: List[str] = Field(
-        default=["baidu", "bing", "sogou", "google", "360"],
+        default=[
+            "baidu",
+            "bing",
+            "sogou",
+            "google",
+            "360",
+            "toutiao",
+            "tencent",
+            "wangyi",
+            "sina",
+            "sohu",
+        ],
         description="启用的搜索引擎列表",
     )
 

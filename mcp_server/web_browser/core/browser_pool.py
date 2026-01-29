@@ -115,13 +115,13 @@ class BrowserPool:
 
         return args
 
-    async def _get_or_create_context(self, user_agent: str, viewport: dict = None) -> BrowserContext:
+    async def _get_or_create_context(self, user_agent: str, viewport: dict = None, engine=None) -> BrowserContext:
         """从池中获取或创建 BrowserContext"""
         async with self._context_lock:
             # 清理过期的 Context
             await self._cleanup_idle_contexts()
 
-            # 检查池中是否有空闲 Context
+            # 检查池中是否有空闲 Context（不考虑引擎差异，因为主要影响的是资源拦截）
             for ctx_info in self._context_pool:
                 ctx = ctx_info.context
                 if len(ctx.pages) == 0:
@@ -135,7 +135,7 @@ class BrowserPool:
 
             # 创建新的 Context
             browser = await self._ensure_browser()
-            context = await self._create_context(browser, user_agent, viewport)
+            context = await self._create_context(browser, user_agent, viewport, engine)
 
             # 添加到池中
             ctx_info = ContextInfo(
@@ -158,7 +158,7 @@ class BrowserPool:
 
             return context
 
-    async def _create_context(self, browser: Browser, user_agent: str, viewport: dict = None) -> BrowserContext:
+    async def _create_context(self, browser: Browser, user_agent: str, viewport: dict = None, engine=None) -> BrowserContext:
         """创建新的浏览器上下文"""
         context_options = {
             "viewport": viewport or {"width": 1920, "height": 1080},
@@ -174,8 +174,13 @@ class BrowserPool:
 
         context = await browser.new_context(**context_options)
 
-        # 设置资源拦截
-        await context.route("**/*", self._block_resources)
+        # 设置资源拦截（使用引擎的策略）
+        if engine:
+            block_list = engine.get_resource_block_list()
+            await context.route("**/*", lambda route: self._block_resources_with_list(route, block_list))
+        else:
+            # 默认策略
+            await context.route("**/*", self._block_resources)
 
         # 设置额外请求头
         await context.set_extra_http_headers({
@@ -193,11 +198,33 @@ class BrowserPool:
 
     @staticmethod
     async def _block_resources(route):
-        """拦截并阻止不必要的资源加载"""
+        """拦截并阻止不必要的资源加载（默认策略）
+
+        只拦截明显非必要的资源，保留页面正常显示所需的核心资源
+        """
         resource_type = route.request.resource_type
         url = route.request.url.lower()
 
-        if resource_type in ["stylesheet", "image", "font", "media", "manifest"] or "icon" in url or "favicon" in url:
+        # 只拦截图片、字体、媒体文件等重型资源
+        # 保留样式表(stylesheet)、脚本(script)、文档(document)等核心资源
+        if resource_type in ["image", "font", "media"] or "icon" in url or "favicon" in url:
+            await route.abort()
+        else:
+            await route.continue_()
+
+    @staticmethod
+    async def _block_resources_with_list(route, block_list: list):
+        """根据给定的列表拦截资源
+
+        Args:
+            route: Playwright route 对象
+            block_list: 需要拦截的资源类型列表，如 ["image", "font", "media"]
+        """
+        resource_type = route.request.resource_type
+        url = route.request.url.lower()
+
+        # 拦截指定类型的资源和图标
+        if resource_type in block_list or "icon" in url or "favicon" in url:
             await route.abort()
         else:
             await route.continue_()
@@ -240,7 +267,7 @@ class BrowserPool:
                 logger.debug(f"清理 Context 失败: {e}")
 
     @asynccontextmanager
-    async def get_page(self, user_agent: str = None, viewport: dict = None):
+    async def get_page(self, user_agent: str = None, viewport: dict = None, engine=None):
         """获取一个浏览器页面（上下文管理器）
 
         用法:
@@ -251,6 +278,7 @@ class BrowserPool:
         Args:
             user_agent: User-Agent 字符串
             viewport: 视口大小
+            engine: 搜索引擎实例（用于定制资源拦截策略）
 
         Yields:
             Page: Playwright Page 对象
@@ -267,7 +295,7 @@ class BrowserPool:
                 f"🔍 获取页面 [活跃: {self._active_requests}/{self.settings.max_concurrent_browsers}]"
             )
 
-            context = await self._get_or_create_context(user_agent, viewport)
+            context = await self._get_or_create_context(user_agent, viewport, engine)
             page = await context.new_page()
 
             try:

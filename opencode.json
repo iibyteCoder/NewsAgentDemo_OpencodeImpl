@@ -52,7 +52,10 @@
       "prompt": "{file:.opencode/agents/event-aggregator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 5
+      "maxSteps": 5,
+      "tools": {
+        "news-storage*": true
+      }
     },
     "validator": {
       "mode": "subagent",
@@ -65,7 +68,8 @@
         "write": false,
         "edit": false,
         "bash": false,
-        "web-browser_*": true
+        "web-browser_*": true,
+        "news-storage*": true
       },
       "permission": {
         "bash": {
@@ -84,7 +88,8 @@
         "write": false,
         "edit": false,
         "bash": false,
-        "web-browser_*": true
+        "web-browser_*": true,
+        "news-storage*": true
       },
       "permission": {
         "bash": {
@@ -103,7 +108,8 @@
         "write": false,
         "edit": false,
         "bash": false,
-        "web-browser_*": true
+        "web-browser_*": true,
+        "news-storage*": true
       },
       "permission": {
         "bash": {
@@ -121,11 +127,33 @@
         "write": true,
         "edit": true,
         "bash": true,
-        "read": true
+        "read": true,
+        "news-storage*": true,
+        "downloader*": true
       },
       "permission": {
         "bash": {
           "mkdir *": "allow"
+        }
+      }
+    },
+    "event-processor": {
+      "mode": "subagent",
+      "description": "事件处理器 - 并发处理单个事件的验证、时间轴、预测",
+      "prompt": "{file:.opencode/agents/event-processor.md}",
+      "hidden": true,
+      "temperature": 0.2,
+      "maxSteps": 25,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "read": true,
+        "news-storage*": true
+      },
+      "permission": {
+        "task": {
+          "*": "allow"
         }
       }
     }

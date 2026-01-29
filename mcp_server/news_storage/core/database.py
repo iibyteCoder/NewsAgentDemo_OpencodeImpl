@@ -56,6 +56,7 @@ class NewsDatabase:
                 html_content TEXT,
                 keywords TEXT,
                 images TEXT,
+                local_images TEXT,
                 tags TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -88,6 +89,14 @@ class NewsDatabase:
             # 字段已存在，忽略错误
             pass
 
+        # 为旧数据库添加 local_images 字段（如果不存在）
+        try:
+            cursor.execute("ALTER TABLE news ADD COLUMN local_images TEXT")
+            logger.debug("📊 已为旧数据库添加 local_images 字段")
+        except sqlite3.OperationalError:
+            # 字段已存在，忽略错误
+            pass
+
         self.conn.commit()
         logger.debug("📊 数据表创建完成")
 
@@ -116,7 +125,7 @@ class NewsDatabase:
                     UPDATE news
                     SET title = ?, summary = ?, source = ?, publish_time = ?,
                         author = ?, event_name = ?, content = ?, html_content = ?,
-                        keywords = ?, images = ?, tags = ?, updated_at = CURRENT_TIMESTAMP
+                        keywords = ?, images = ?, local_images = ?, tags = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE url = ?
                     """,
                     (
@@ -130,6 +139,7 @@ class NewsDatabase:
                         news_dict["html_content"],
                         news_dict["keywords"],
                         news_dict["images"],
+                        news_dict["local_images"],
                         news_dict["tags"],
                         news.url,
                     ),
@@ -143,8 +153,8 @@ class NewsDatabase:
                     """
                     INSERT INTO news (
                         title, url, summary, source, publish_time, author, event_name,
-                        content, html_content, keywords, images, tags, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        content, html_content, keywords, images, local_images, tags, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         news_dict["title"],
@@ -158,6 +168,7 @@ class NewsDatabase:
                         news_dict["html_content"],
                         news_dict["keywords"],
                         news_dict["images"],
+                        news_dict["local_images"],
                         news_dict["tags"],
                         news_dict["created_at"],
                         news_dict["updated_at"],
@@ -212,7 +223,7 @@ class NewsDatabase:
         cursor.execute(
             """
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, images, tags, created_at, updated_at
+                   content, html_content, keywords, images, local_images, tags, created_at, updated_at
             FROM news WHERE url = ?
             """,
             (url,),
@@ -238,11 +249,23 @@ class NewsDatabase:
         conditions = []
         params = []
 
-        # 关键词搜索（使用 LIKE - 支持标题、事件名称、摘要、内容）
-        if filter.keyword:
-            conditions.append("(title LIKE ? OR event_name LIKE ? OR summary LIKE ? OR content LIKE ?)")
-            keyword_pattern = f"%{filter.keyword}%"
-            params.extend([keyword_pattern, keyword_pattern, keyword_pattern, keyword_pattern])
+        # 智能搜索：每个词在所有字段中独立搜索（OR关系）
+        if filter.search_terms:
+            # 为每个搜索词构建条件：(标题 OR 摘要 OR keywords字段 OR 内容)
+            term_conditions = []
+            for term in filter.search_terms:
+                term_pattern = f"%{term}%"
+                # 每个词在4个字段中搜索
+                term_conditions.append(f"""(
+                    title LIKE ? OR
+                    summary LIKE ? OR
+                    keywords LIKE ? OR
+                    content LIKE ?
+                )""")
+                params.extend([term_pattern, term_pattern, f'%"{term}"%', term_pattern])
+
+            # 多个词之间是 OR 关系：满足任意一个词即可
+            conditions.append(f"({' OR '.join(term_conditions)})")
 
         # 来源筛选
         if filter.source:
@@ -279,7 +302,7 @@ class NewsDatabase:
         # 执行查询
         query = f"""
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, images, tags, created_at, updated_at
+                   content, html_content, keywords, images, local_images, tags, created_at, updated_at
             FROM news
             {where_clause}
             ORDER BY created_at DESC
@@ -309,7 +332,7 @@ class NewsDatabase:
         cursor.execute(
             """
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, images, tags, created_at, updated_at
+                   content, html_content, keywords, images, local_images, tags, created_at, updated_at
             FROM news
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?

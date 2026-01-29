@@ -19,6 +19,10 @@ class BaiduEngine(BaseEngine):
         )
         super().__init__(config)
 
+    def get_resource_block_list(self) -> List[str]:
+        """百度可以拦截图片、字体和媒体"""
+        return ["image", "font", "media"]
+
     async def search(
         self,
         page: Page,

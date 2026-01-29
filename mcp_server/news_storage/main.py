@@ -43,58 +43,36 @@ async def save_news(
     html_content: str = "",
     keywords: str = "[]",
     images: str = "[]",
+    local_images: str = "[]",
     tags: str = "[]",
 ) -> str:
-    """保存单条新闻 - 💾 自动去重（基于URL）
-
-    功能：
-    - 保存新闻的完整信息到SQLite数据库
-    - 自动检测URL是否已存在，存在则更新
-    - 支持保存标题、摘要、来源、时间、内容等完整信息
-    - 支持关键词、图片URL（多个）、标签等扩展信息
-    - 支持事件名称归类
+    """保存单条新闻（URL唯一，已存在则更新）
 
     Args:
-        title: 新闻标题（必填）
-        url: 新闻URL（必填，用作唯一标识）
-        summary: 新闻摘要（可选）
-        source: 新闻来源（可选，如"新华网"）
-        publish_time: 发布时间（可选，原始字符串）
-        author: 作者（可选）
-        event_name: 事件名称（可选，用于归类同一事件的新闻）
-        content: 完整内容-纯文本（可选）
-        html_content: HTML内容（原文）（可选）
-        keywords: 关键词JSON数组（可选，如 '["AI", "技术"]'）
-        images: 图片URL JSON数组（可选，支持多个图片）
-        tags: 标签 JSON数组（可选）
+        title: 标题（必填）
+        url: URL（必填，唯一标识）
+        summary: 摘要
+        source: 来源
+        publish_time: 发布时间
+        author: 作者
+        event_name: 事件名称
+        content: 纯文本内容
+        html_content: HTML内容
+        keywords: 关键词JSON数组
+        images: 图片URL JSON数组（远程图片URL）
+        local_images: 本地图片路径 JSON数组（下载后的本地路径）
+        tags: 标签JSON数组
 
     Returns:
-        JSON格式的操作结果，包含：
-        - success: 是否成功
-        - action: "inserted" 或 "updated"
-        - message: 结果消息
-        - url: 新闻URL
+        JSON格式：{success, action, message, url}
 
     Examples:
-        >>> # 保存基本新闻信息
-        >>> save_news(
+        >>> # 保存带本地路径的新闻
+        >>> save_news_tool(
         ...     title="AI技术突破",
         ...     url="https://example.com/news/123",
-        ...     summary="人工智能取得重大突破",
-        ...     source="科技日报"
-        ... )
-        >>> # 保存完整新闻（包括内容、图片、事件名称）
-        >>> save_news(
-        ...     title="AI技术突破",
-        ...     url="https://example.com/news/123",
-        ...     summary="人工智能取得重大突破",
-        ...     source="科技日报",
-        ...     event_name="2026年AI技术突破事件",
-        ...     content="完整的新闻内容...",
-        ...     html_content="<p>HTML原文</p>",
-        ...     keywords='["AI", "技术"]',
-        ...     images='["https://example.com/img1.jpg", "https://example.com/img2.jpg"]',
-        ...     tags='["科技", "前沿"]'
+        ...     images='["https://example.com/img1.jpg"]',
+        ...     local_images='["./report/科技/2026-01-29/资讯汇总与摘要/事件1/img1.jpg"]'
         ... )
     """
     return await save_news_tool(
@@ -109,73 +87,40 @@ async def save_news(
         html_content=html_content,
         keywords=keywords,
         images=images,
+        local_images=local_images,
         tags=tags,
     )
 
 
 @server.tool(name="news_storage_save_batch")
 async def save_news_batch(news_list: str) -> str:
-    """批量保存新闻 - 📦 高效批量导入
-
-    功能：
-    - 一次性保存多条新闻
-    - 自动去重，已存在的URL会更新而非报错
-    - 返回详细的统计信息
+    """批量保存新闻
 
     Args:
-        news_list: 新闻列表JSON字符串，格式为：
-            [
-                {
-                    "title": "标题",
-                    "url": "https://...",
-                    "summary": "摘要",
-                    "source": "来源",
-                    ...
-                },
-                ...
-            ]
+        news_list: 新闻列表JSON字符串
 
     Returns:
-        JSON格式的批量操作结果，包含：
-        - success: 是否成功
-        - added: 新增数量
-        - updated: 更新数量
-        - failed: 失败数量
-        - total: 总数
-
-    Examples:
-        >>> news_data = '''[
-        ...     {"title": "新闻1", "url": "https://example.com/1", "source": "新华网"},
-        ...     {"title": "新闻2", "url": "https://example.com/2", "source": "人民网"}
-        ... ]'''
-        >>> save_news_batch(news_data)
+        JSON格式：{success, added, updated, failed, total}
     """
     return await save_news_batch_tool(news_list=news_list)
 
 
 @server.tool(name="news_storage_get_by_url")
 async def get_news_by_url(url: str) -> str:
-    """根据URL获取新闻 - 🔍 精确查询
-
-    功能：
-    - 根据新闻URL精确查询
-    - 返回完整的新闻信息
+    """根据URL获取新闻
 
     Args:
         url: 新闻URL
 
     Returns:
-        JSON格式的新闻数据，不存在则返回null
-
-    Examples:
-        >>> get_news_by_url("https://example.com/news/123")
+        JSON格式的新闻数据，不存在返回null
     """
     return await get_news_by_url_tool(url=url)
 
 
 @server.tool(name="news_storage_search")
 async def search_news(
-    keyword: str = None,
+    search: str = None,
     source: str = None,
     event_name: str = None,
     start_date: str = None,
@@ -184,51 +129,23 @@ async def search_news(
     limit: int = 100,
     offset: int = 0,
 ) -> str:
-    """搜索新闻 - 🔎 支持多条件筛选
-
-    功能：
-    - 根据关键词模糊搜索（标题、事件名称、摘要、内容）
-    - 按来源筛选
-    - 按事件名称精确筛选（查找同一事件的所有新闻）
-    - 按日期范围筛选
-    - 按标签筛选（支持多标签）
-    - 支持分页
+    """搜索新闻（支持多词空格分隔，自动分词搜索所有字段）
 
     Args:
-        keyword: 搜索关键词（可选，模糊匹配标题、事件名称、摘要、内容）
-        source: 来源筛选（可选，如"新华网"）
-        event_name: 事件名称精确筛选（可选）
-        start_date: 开始日期（可选，ISO格式）
-        end_date: 结束日期（可选，ISO格式）
-        tags: 标签JSON数组（可选，如 '["科技", "AI"]'）
-        limit: 返回数量（默认100）
-        offset: 偏移量（默认0，用于分页）
+        search: 搜索词（多词空格分隔）
+        source: 来源筛选
+        event_name: 事件名称筛选
+        start_date: 开始日期
+        end_date: 结束日期
+        tags: 标签JSON数组
+        limit: 返回数量
+        offset: 偏移量
 
     Returns:
-        JSON格式的搜索结果，包含：
-        - success: 是否成功
-        - count: 结果数量
-        - results: 新闻列表
-        - filters: 使用的筛选条件
-
-    Examples:
-        >>> # 关键词搜索（模糊匹配标题和事件名称）
-        >>> search_news(keyword="AI", limit=10)
-        >>> # 按来源搜索
-        >>> search_news(source="新华网", limit=20)
-        >>> # 按事件名称搜索
-        >>> search_news(event_name="2026年AI技术突破事件")
-        >>> # 组合搜索
-        >>> search_news(
-        ...     keyword="AI技术",
-        ...     source="科技日报",
-        ...     event_name="2026年AI技术突破事件",
-        ...     tags='["科技", "前沿"]',
-        ...     limit=50
-        ... )
+        JSON格式：{success, count, results, filters}
     """
     return await search_news_tool(
-        keyword=keyword,
+        search=search,
         source=source,
         event_name=event_name,
         start_date=start_date,
@@ -241,25 +158,14 @@ async def search_news(
 
 @server.tool(name="news_storage_get_recent")
 async def get_recent_news(limit: int = 100, offset: int = 0) -> str:
-    """获取最近添加的新闻 - 📰 最新资讯
-
-    功能：
-    - 获取最近添加的新闻列表
-    - 按添加时间倒序排列
-    - 支持分页
+    """获取最近添加的新闻（按添加时间倒序）
 
     Args:
-        limit: 返回数量（默认100）
-        offset: 偏移量（默认0，用于分页）
+        limit: 返回数量
+        offset: 偏移量
 
     Returns:
         JSON格式的新闻列表
-
-    Examples:
-        >>> # 获取最近100条新闻
-        >>> get_recent_news(limit=100)
-        >>> # 分页获取
-        >>> get_recent_news(limit=20, offset=20)  # 第2页
     """
     return await get_recent_news_tool(limit=limit, offset=offset)
 
@@ -268,26 +174,15 @@ async def get_recent_news(limit: int = 100, offset: int = 0) -> str:
 async def update_news_content(
     url: str, content: str, html_content: str = ""
 ) -> str:
-    """更新新闻内容 - ✏️ 补充完整内容
-
-    功能：
-    - 更新已存在新闻的内容
-    - 用于后续补充完整正文内容
+    """更新新闻内容
 
     Args:
         url: 新闻URL
         content: 纯文本内容
-        html_content: HTML内容（可选）
+        html_content: HTML内容
 
     Returns:
         JSON格式的操作结果
-
-    Examples:
-        >>> update_news_content(
-        ...     url="https://example.com/news/123",
-        ...     content="这是完整的新闻正文内容...",
-        ...     html_content="<p>这是HTML内容</p>"
-        ... )
     """
     return await update_news_content_tool(
         url=url, content=content, html_content=html_content
@@ -296,49 +191,30 @@ async def update_news_content(
 
 @server.tool(name="news_storage_delete")
 async def delete_news(url: str) -> str:
-    """删除新闻 - 🗑️ 从数据库删除
-
-    功能：
-    - 根据URL删除新闻
-    - 不可恢复
+    """删除新闻
 
     Args:
         url: 新闻URL
 
     Returns:
         JSON格式的操作结果
-
-    Examples:
-        >>> delete_news("https://example.com/news/123")
     """
     return await delete_news_tool(url=url)
 
 
 @server.tool(name="news_storage_stats")
 async def get_news_stats() -> str:
-    """获取统计信息 - 📊 数据概览
-
-    功能：
-    - 获取数据库中的新闻统计信息
-    - 总数、来源分布、近期新增等
+    """获取统计信息
 
     Returns:
         JSON格式的统计数据
-
-    Examples:
-        >>> get_news_stats()
     """
     return await get_news_stats_tool()
 
 
 @server.tool(name="news_storage_update_event_name")
 async def update_event_name(url: str, event_name: str) -> str:
-    """更新新闻的事件名称 - 🏷️ 聚合后归类
-
-    功能：
-    - 单独更新新闻的事件名称字段
-    - 用于新闻聚合后添加事件分类
-    - 不会影响其他字段
+    """更新新闻的事件名称
 
     Args:
         url: 新闻URL
@@ -346,43 +222,20 @@ async def update_event_name(url: str, event_name: str) -> str:
 
     Returns:
         JSON格式的操作结果
-
-    Examples:
-        >>> # 为新闻添加事件名称
-        >>> update_event_name(
-        ...     url="https://example.com/news/123",
-        ...     event_name="2026年AI技术突破事件"
-        ... )
     """
     return await update_event_name_tool(url=url, event_name=event_name)
 
 
 @server.tool(name="news_storage_batch_update_event_name")
 async def batch_update_event_name(urls: str, event_name: str) -> str:
-    """批量更新新闻的事件名称 - 📦 批量归类
-
-    功能：
-    - 批量为多条新闻设置相同的事件名称
-    - 用于将聚合后的新闻归类到同一事件
-    - 返回详细的更新统计
+    """批量更新新闻的事件名称
 
     Args:
-        urls: URL列表JSON字符串（如 '["url1", "url2"]'）
+        urls: URL列表JSON字符串
         event_name: 事件名称
 
     Returns:
-        JSON格式的批量操作结果，包含：
-        - success: 是否成功
-        - updated: 更新数量
-        - failed: 失败数量
-        - event_name: 事件名称
-
-    Examples:
-        >>> urls = '["https://example.com/news/1", "https://example.com/news/2"]'
-        >>> batch_update_event_name(
-        ...     urls=urls,
-        ...     event_name="2026年AI技术突破事件"
-        ... )
+        JSON格式：{success, updated, failed, event_name}
     """
     return await batch_update_event_name_tool(urls=urls, event_name=event_name)
 
