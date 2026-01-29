@@ -2,12 +2,12 @@
 
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from loguru import logger
 
 from ..core.config import get_settings
-from ..core.downloader import get_downloader
+from ..core.downloader import Downloader
 from ..utils.helpers import extract_image_urls, sanitize_filename
 
 
@@ -26,12 +26,10 @@ async def download_file(
     Returns:
         JSON格式的下载结果
     """
-    downloader = get_downloader()
-    save_dir = Path(save_path) if save_path else None
-
-    result = await downloader.download(url, save_dir, filename)
-
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    async with Downloader() as downloader:
+        save_dir = Path(save_path) if save_path else None
+        result = await downloader.download(url, save_dir, filename)
+        return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 async def download_files(
@@ -49,21 +47,20 @@ async def download_files(
     Returns:
         JSON格式的批量下载结果
     """
-    downloader = get_downloader()
-    save_dir = Path(save_path) if save_path else None
+    async with Downloader() as downloader:
+        save_dir = Path(save_path) if save_path else None
+        results = await downloader.download_batch(urls, save_dir, max_concurrent)
 
-    results = await downloader.download_batch(urls, save_dir, max_concurrent)
+        # 添加统计信息
+        success_count = sum(1 for r in results if r.get("success"))
+        summary = {
+            "total": len(urls),
+            "success": success_count,
+            "failed": len(urls) - success_count,
+            "results": results,
+        }
 
-    # 添加统计信息
-    success_count = sum(1 for r in results if r.get("success"))
-    summary = {
-        "total": len(urls),
-        "success": success_count,
-        "failed": len(urls) - success_count,
-        "results": results,
-    }
-
-    return json.dumps(summary, ensure_ascii=False, indent=2)
+        return json.dumps(summary, ensure_ascii=False, indent=2)
 
 
 async def download_images_from_html(
@@ -104,21 +101,20 @@ async def download_images_from_html(
     logger.info(f"找到 {len(image_urls)} 个图片URL")
 
     # 批量下载
-    downloader = get_downloader()
-    save_dir = Path(save_path) if save_path else None
+    async with Downloader() as downloader:
+        save_dir = Path(save_path) if save_path else None
+        results = await downloader.download_batch(image_urls, save_dir, max_concurrent)
 
-    results = await downloader.download_batch(image_urls, save_dir, max_concurrent)
+        # 添加统计信息
+        success_count = sum(1 for r in results if r.get("success"))
+        summary = {
+            "total": len(image_urls),
+            "success": success_count,
+            "failed": len(image_urls) - success_count,
+            "results": results,
+        }
 
-    # 添加统计信息
-    success_count = sum(1 for r in results if r.get("success"))
-    summary = {
-        "total": len(image_urls),
-        "success": success_count,
-        "failed": len(image_urls) - success_count,
-        "results": results,
-    }
-
-    return json.dumps(summary, ensure_ascii=False, indent=2)
+        return json.dumps(summary, ensure_ascii=False, indent=2)
 
 
 async def download_images_from_url(
@@ -140,31 +136,31 @@ async def download_images_from_url(
 
     logger.info(f"正在获取网页内容: {page_url}")
 
-    downloader = get_downloader()
-    client = await downloader._get_client()
+    async with Downloader() as downloader:
+        client = await downloader._get_client()
 
-    try:
-        response = await client.get(page_url)
-        response.raise_for_status()
-        html_content = response.text
+        try:
+            response = await client.get(page_url)
+            response.raise_for_status()
+            html_content = response.text
 
-        logger.info("网页内容获取成功，开始提取图片")
+            logger.info("网页内容获取成功，开始提取图片")
 
-        # 使用提取的URL作为base_url
-        return await download_images_from_html(
-            html_content, page_url, save_path, max_concurrent
-        )
+            # 使用提取的URL作为base_url
+            return await download_images_from_html(
+                html_content, page_url, save_path, max_concurrent
+            )
 
-    except Exception as e:
-        logger.error(f"获取网页内容失败: {e}")
-        return json.dumps(
-            {
-                "total": 0,
-                "success": 0,
-                "failed": 0,
-                "error": str(e),
-                "message": f"获取网页内容失败: {e}",
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
+        except Exception as e:
+            logger.error(f"获取网页内容失败: {e}")
+            return json.dumps(
+                {
+                    "total": 0,
+                    "success": 0,
+                    "failed": 0,
+                    "error": str(e),
+                    "message": f"获取网页内容失败: {e}",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )

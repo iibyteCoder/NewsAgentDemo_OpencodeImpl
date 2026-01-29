@@ -37,19 +37,16 @@ hidden: true
 
 - `news-storage_save_news_tool`: 保存搜索结果到数据库
   - **每轮搜索后必须保存结果！**
-  - 参数：title, url, summary, source, publish_time, content, html_content, images, local_images
+  - 参数：title, url, summary, source, publish_time, content, html_content, image_urls
+  - 使用 `web-browser_fetch_article_content_tool` 提取内容时，返回的图片链接必须保存到 `image_urls`
   - 确保数据真实性和可追溯性
-  - **注意**：验证阶段只保存 images（远程URL），local_images 由 synthesizer 填写
 
 - `news-storage_search_news_tool`: 从数据库读取相关新闻
-  - 参数：keyword, event_name, source, limit
-  - 用于读取所有搜索结果进行综合分析
-
-- `news-storage_get_recent_news_tool`: 获取最近的新闻
+  - 参数：search, source, event_name, limit
 
 ⚠️ **重要**：
 
-- **必须使用数据库工具** - 保存搜索结果 + 读取分析
+- **必须保存图片链接** - 使用 `fetch_article_content` 后必须将返回的图片保存到 `image_urls` 字段
 - 工作流程：搜索 → 保存 → 读取 → 分析
 
 ## 工作流程

@@ -1,8 +1,8 @@
 """
-数据库管理器 - SQLite
+数据库管理器 - SQLite (异步版本)
 """
 
-import sqlite3
+import aiosqlite
 import json
 from pathlib import Path
 from typing import List, Optional
@@ -12,7 +12,7 @@ from .models import NewsItem, SearchFilter
 
 
 class NewsDatabase:
-    """新闻数据库管理器"""
+    """新闻数据库管理器 (异步)"""
 
     def __init__(self, db_path: str = "./data/news_storage.db"):
         """初始化数据库
@@ -23,25 +23,31 @@ class NewsDatabase:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.conn: Optional[sqlite3.Connection] = None
-        self._connect()
-        self._create_tables()
+        self.conn: Optional[aiosqlite.Connection] = None
+        self._initialized = False
 
-        logger.info(f"✅ NewsDatabase 初始化完成: {self.db_path}")
+    async def _ensure_connection(self) -> aiosqlite.Connection:
+        """确保数据库已连接和初始化"""
+        if not self._initialized or self.conn is None:
+            await self._connect()
+            await self._create_tables()
+            self._initialized = True
+            logger.info(f"✅ NewsDatabase 初始化完成: {self.db_path}")
+        # 类型断言：此时 conn 一定不为 None
+        assert self.conn is not None
+        return self.conn
 
-    def _connect(self):
+    async def _connect(self):
         """连接数据库"""
-        self.conn = sqlite3.connect(
-            self.db_path, check_same_thread=False, timeout=30
-        )
-        self.conn.row_factory = sqlite3.Row  # 支持字典式访问
+        self.conn = await aiosqlite.connect(self.db_path, timeout=30)
+        self.conn.row_factory = aiosqlite.Row  # 支持字典式访问
 
-    def _create_tables(self):
+    async def _create_tables(self):
         """创建数据表"""
-        cursor = self.conn.cursor()
+        cursor = await self.conn.cursor()
 
         # 主表
-        cursor.execute(
+        await cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS news (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,8 +61,8 @@ class NewsDatabase:
                 content TEXT,
                 html_content TEXT,
                 keywords TEXT,
-                images TEXT,
-                local_images TEXT,
+                image_urls TEXT,
+                local_image_paths TEXT,
                 tags TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,42 +71,24 @@ class NewsDatabase:
         )
 
         # 创建索引
-        cursor.execute(
-            """CREATE INDEX IF NOT EXISTS idx_news_url ON news(url)"""
-        )
-        cursor.execute(
+        await cursor.execute("""CREATE INDEX IF NOT EXISTS idx_news_url ON news(url)""")
+        await cursor.execute(
             """CREATE INDEX IF NOT EXISTS idx_news_source ON news(source)"""
         )
-        cursor.execute(
+        await cursor.execute(
             """CREATE INDEX IF NOT EXISTS idx_news_created_at ON news(created_at)"""
         )
-        cursor.execute(
+        await cursor.execute(
             """CREATE INDEX IF NOT EXISTS idx_news_publish_time ON news(publish_time)"""
         )
-        cursor.execute(
+        await cursor.execute(
             """CREATE INDEX IF NOT EXISTS idx_news_event_name ON news(event_name)"""
         )
 
-        # 为旧数据库添加 event_name 字段（如果不存在）
-        try:
-            cursor.execute("ALTER TABLE news ADD COLUMN event_name TEXT")
-            logger.debug("📊 已为旧数据库添加 event_name 字段")
-        except sqlite3.OperationalError:
-            # 字段已存在，忽略错误
-            pass
-
-        # 为旧数据库添加 local_images 字段（如果不存在）
-        try:
-            cursor.execute("ALTER TABLE news ADD COLUMN local_images TEXT")
-            logger.debug("📊 已为旧数据库添加 local_images 字段")
-        except sqlite3.OperationalError:
-            # 字段已存在，忽略错误
-            pass
-
-        self.conn.commit()
+        await self.conn.commit()
         logger.debug("📊 数据表创建完成")
 
-    def save_news(self, news: NewsItem) -> bool:
+    async def save_news(self, news: NewsItem) -> bool:
         """保存单条新闻（自动去重）
 
         Args:
@@ -109,23 +97,24 @@ class NewsDatabase:
         Returns:
             是否插入新记录（False表示更新已存在记录）
         """
-        cursor = self.conn.cursor()
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
 
         try:
             # 检查是否已存在
-            cursor.execute("SELECT id FROM news WHERE url = ?", (news.url,))
-            existing = cursor.fetchone()
+            await cursor.execute("SELECT id FROM news WHERE url = ?", (news.url,))
+            existing = await cursor.fetchone()
 
             news_dict = news.to_dict()
 
             if existing:
                 # 更新
-                cursor.execute(
+                await cursor.execute(
                     """
                     UPDATE news
                     SET title = ?, summary = ?, source = ?, publish_time = ?,
                         author = ?, event_name = ?, content = ?, html_content = ?,
-                        keywords = ?, images = ?, local_images = ?, tags = ?, updated_at = CURRENT_TIMESTAMP
+                        keywords = ?, image_urls = ?, local_image_paths = ?, tags = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE url = ?
                     """,
                     (
@@ -138,22 +127,22 @@ class NewsDatabase:
                         news_dict["content"],
                         news_dict["html_content"],
                         news_dict["keywords"],
-                        news_dict["images"],
-                        news_dict["local_images"],
+                        news_dict["image_urls"],
+                        news_dict["local_image_paths"],
                         news_dict["tags"],
                         news.url,
                     ),
                 )
                 logger.debug(f"📝 更新新闻: {news.title[:50]}")
-                self.conn.commit()
+                await conn.commit()
                 return False
             else:
                 # 插入
-                cursor.execute(
+                await cursor.execute(
                     """
                     INSERT INTO news (
                         title, url, summary, source, publish_time, author, event_name,
-                        content, html_content, keywords, images, local_images, tags, created_at, updated_at
+                        content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -167,23 +156,23 @@ class NewsDatabase:
                         news_dict["content"],
                         news_dict["html_content"],
                         news_dict["keywords"],
-                        news_dict["images"],
-                        news_dict["local_images"],
+                        news_dict["image_urls"],
+                        news_dict["local_image_paths"],
                         news_dict["tags"],
                         news_dict["created_at"],
                         news_dict["updated_at"],
                     ),
                 )
                 logger.debug(f"✅ 新增新闻: {news.title[:50]}")
-                self.conn.commit()
+                await conn.commit()
                 return True
 
-        except sqlite3.Error as e:
+        except aiosqlite.Error as e:
             logger.error(f"❌ 保存新闻失败: {e}")
-            self.conn.rollback()
+            await conn.rollback()
             raise
 
-    def save_news_batch(self, news_list: List[NewsItem]) -> dict:
+    async def save_news_batch(self, news_list: List[NewsItem]) -> dict:
         """批量保存新闻
 
         Args:
@@ -198,7 +187,7 @@ class NewsDatabase:
 
         for news in news_list:
             try:
-                if self.save_news(news):
+                if await self.save_news(news):
                     added += 1
                 else:
                     updated += 1
@@ -210,7 +199,7 @@ class NewsDatabase:
         logger.info(f"📊 批量保存完成: {result}")
         return result
 
-    def get_news_by_url(self, url: str) -> Optional[NewsItem]:
+    async def get_news_by_url(self, url: str) -> Optional[NewsItem]:
         """根据URL获取新闻
 
         Args:
@@ -219,22 +208,23 @@ class NewsDatabase:
         Returns:
             新闻对象，不存在则返回None
         """
-        cursor = self.conn.cursor()
-        cursor.execute(
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+        await cursor.execute(
             """
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, images, local_images, tags, created_at, updated_at
+                   content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
             FROM news WHERE url = ?
             """,
             (url,),
         )
 
-        row = cursor.fetchone()
+        row = await cursor.fetchone()
         if row:
             return NewsItem.from_db_row(row)
         return None
 
-    def search_news(self, filter: SearchFilter) -> List[NewsItem]:
+    async def search_news(self, filter: SearchFilter) -> List[NewsItem]:
         """搜索新闻
 
         Args:
@@ -243,7 +233,8 @@ class NewsDatabase:
         Returns:
             新闻列表
         """
-        cursor = self.conn.cursor()
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
 
         # 构建SQL查询
         conditions = []
@@ -256,12 +247,14 @@ class NewsDatabase:
             for term in filter.search_terms:
                 term_pattern = f"%{term}%"
                 # 每个词在4个字段中搜索
-                term_conditions.append(f"""(
+                term_conditions.append(
+                    """(
                     title LIKE ? OR
                     summary LIKE ? OR
                     keywords LIKE ? OR
                     content LIKE ?
-                )""")
+                )"""
+                )
                 params.extend([term_pattern, term_pattern, f'%"{term}"%', term_pattern])
 
             # 多个词之间是 OR 关系：满足任意一个词即可
@@ -302,7 +295,7 @@ class NewsDatabase:
         # 执行查询
         query = f"""
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, images, local_images, tags, created_at, updated_at
+                   content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
             FROM news
             {where_clause}
             ORDER BY created_at DESC
@@ -311,12 +304,12 @@ class NewsDatabase:
 
         params.extend([filter.limit, filter.offset])
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
+        await cursor.execute(query, params)
+        rows = await cursor.fetchall()
 
         return [NewsItem.from_db_row(row) for row in rows]
 
-    def get_recent_news(
+    async def get_recent_news(
         self, limit: int = 100, offset: int = 0
     ) -> List[NewsItem]:
         """获取最近添加的新闻
@@ -328,11 +321,12 @@ class NewsDatabase:
         Returns:
             新闻列表
         """
-        cursor = self.conn.cursor()
-        cursor.execute(
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+        await cursor.execute(
             """
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, images, local_images, tags, created_at, updated_at
+                   content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
             FROM news
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
@@ -340,10 +334,12 @@ class NewsDatabase:
             (limit, offset),
         )
 
-        rows = cursor.fetchall()
+        rows = await cursor.fetchall()
         return [NewsItem.from_db_row(row) for row in rows]
 
-    def update_news_content(self, url: str, content: str, html_content: str = "") -> bool:
+    async def update_news_content(
+        self, url: str, content: str, html_content: str = ""
+    ) -> bool:
         """更新新闻内容
 
         Args:
@@ -354,8 +350,9 @@ class NewsDatabase:
         Returns:
             是否成功
         """
-        cursor = self.conn.cursor()
-        cursor.execute(
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+        await cursor.execute(
             """
             UPDATE news
             SET content = ?, html_content = ?, updated_at = CURRENT_TIMESTAMP
@@ -364,7 +361,7 @@ class NewsDatabase:
             (content, html_content, url),
         )
 
-        self.conn.commit()
+        await conn.commit()
         success = cursor.rowcount > 0
 
         if success:
@@ -374,7 +371,7 @@ class NewsDatabase:
 
         return success
 
-    def update_event_name(self, url: str, event_name: str) -> bool:
+    async def update_event_name(self, url: str, event_name: str) -> bool:
         """更新新闻的事件名称
 
         Args:
@@ -384,8 +381,9 @@ class NewsDatabase:
         Returns:
             是否成功
         """
-        cursor = self.conn.cursor()
-        cursor.execute(
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+        await cursor.execute(
             """
             UPDATE news
             SET event_name = ?, updated_at = CURRENT_TIMESTAMP
@@ -394,7 +392,7 @@ class NewsDatabase:
             (event_name, url),
         )
 
-        self.conn.commit()
+        await conn.commit()
         success = cursor.rowcount > 0
 
         if success:
@@ -404,7 +402,7 @@ class NewsDatabase:
 
         return success
 
-    def batch_update_event_name(self, urls: List[str], event_name: str) -> dict:
+    async def batch_update_event_name(self, urls: List[str], event_name: str) -> dict:
         """批量更新新闻的事件名称
 
         Args:
@@ -418,7 +416,7 @@ class NewsDatabase:
         failed = 0
 
         for url in urls:
-            if self.update_event_name(url, event_name):
+            if await self.update_event_name(url, event_name):
                 updated += 1
             else:
                 failed += 1
@@ -427,7 +425,7 @@ class NewsDatabase:
         logger.info(f"📊 批量更新事件名称完成: {result}")
         return result
 
-    def delete_news(self, url: str) -> bool:
+    async def delete_news(self, url: str) -> bool:
         """删除新闻
 
         Args:
@@ -436,10 +434,11 @@ class NewsDatabase:
         Returns:
             是否成功
         """
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM news WHERE url = ?", (url,))
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+        await cursor.execute("DELETE FROM news WHERE url = ?", (url,))
 
-        self.conn.commit()
+        await conn.commit()
         success = cursor.rowcount > 0
 
         if success:
@@ -449,20 +448,21 @@ class NewsDatabase:
 
         return success
 
-    def get_stats(self) -> dict:
+    async def get_stats(self) -> dict:
         """获取统计信息
 
         Returns:
             统计数据
         """
-        cursor = self.conn.cursor()
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
 
         # 总数
-        cursor.execute("SELECT COUNT(*) FROM news")
-        total = cursor.fetchone()[0]
+        await cursor.execute("SELECT COUNT(*) FROM news")
+        total = (await cursor.fetchone())[0]
 
         # 按来源统计
-        cursor.execute(
+        await cursor.execute(
             """
             SELECT source, COUNT(*) as count
             FROM news
@@ -471,16 +471,16 @@ class NewsDatabase:
             LIMIT 10
         """
         )
-        by_source = {row[0]: row[1] for row in cursor.fetchall()}
+        by_source = {row[0]: row[1] for row in await cursor.fetchall()}
 
         # 最近7天添加数量
-        cursor.execute(
+        await cursor.execute(
             """
             SELECT COUNT(*) FROM news
             WHERE created_at >= datetime('now', '-7 days')
         """
         )
-        recent_week = cursor.fetchone()[0]
+        recent_week = (await cursor.fetchone())[0]
 
         return {
             "total": total,
@@ -489,26 +489,29 @@ class NewsDatabase:
             "db_path": str(self.db_path),
         }
 
-    def close(self):
+    async def close(self):
         """关闭数据库连接"""
         if self.conn:
-            self.conn.close()
+            await self.conn.close()
+            self.conn = None
+            self._initialized = False
             logger.info("🔒 数据库连接已关闭")
 
-    def __enter__(self):
-        """上下文管理器支持"""
+    async def __aenter__(self):
+        """异步上下文管理器支持"""
+        await self._ensure_connection()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器支持"""
-        self.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器支持"""
+        await self.close()
 
 
 # 全局数据库实例
 _db_instance: Optional[NewsDatabase] = None
 
 
-def get_database(db_path: str = "./data/news_storage.db") -> NewsDatabase:
+async def get_database(db_path: str = "./data/news_storage.db") -> NewsDatabase:
     """获取数据库实例（单例模式）
 
     Args:
@@ -521,5 +524,6 @@ def get_database(db_path: str = "./data/news_storage.db") -> NewsDatabase:
 
     if _db_instance is None:
         _db_instance = NewsDatabase(db_path)
+        await _db_instance._ensure_connection()
 
     return _db_instance

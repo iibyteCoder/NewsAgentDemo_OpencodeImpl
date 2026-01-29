@@ -4,6 +4,8 @@ News Storage MCP Server - 新闻存储管理器
 提供新闻数据的持久化存储和检索功能
 """
 
+from typing import Optional
+
 from mcp.server.fastmcp import FastMCP
 from loguru import logger
 
@@ -42,8 +44,8 @@ async def save_news(
     content: str = "",
     html_content: str = "",
     keywords: str = "[]",
-    images: str = "[]",
-    local_images: str = "[]",
+    image_urls: str = "[]",
+    local_image_paths: str = "[]",
     tags: str = "[]",
 ) -> str:
     """保存单条新闻（URL唯一，已存在则更新）
@@ -59,8 +61,8 @@ async def save_news(
         content: 纯文本内容
         html_content: HTML内容
         keywords: 关键词JSON数组
-        images: 图片URL JSON数组（远程图片URL）
-        local_images: 本地图片路径 JSON数组（下载后的本地路径）
+        image_urls: 网络图片URL JSON数组（远程图片URL）
+        local_image_paths: 本地图片路径 JSON数组（下载后的本地路径）
         tags: 标签JSON数组
 
     Returns:
@@ -71,8 +73,8 @@ async def save_news(
         >>> save_news_tool(
         ...     title="AI技术突破",
         ...     url="https://example.com/news/123",
-        ...     images='["https://example.com/img1.jpg"]',
-        ...     local_images='["./report/科技/2026-01-29/资讯汇总与摘要/事件1/img1.jpg"]'
+        ...     image_urls='["https://example.com/img1.jpg"]',
+        ...     local_image_paths='["./report/科技/2026-01-29/资讯汇总与摘要/事件1/img1.jpg"]'
         ... )
     """
     return await save_news_tool(
@@ -86,8 +88,8 @@ async def save_news(
         content=content,
         html_content=html_content,
         keywords=keywords,
-        images=images,
-        local_images=local_images,
+        image_urls=image_urls,
+        local_image_paths=local_image_paths,
         tags=tags,
     )
 
@@ -120,12 +122,12 @@ async def get_news_by_url(url: str) -> str:
 
 @server.tool(name="news_storage_search")
 async def search_news(
-    search: str = None,
-    source: str = None,
-    event_name: str = None,
-    start_date: str = None,
-    end_date: str = None,
-    tags: str = None,
+    search: Optional[str] = None,
+    source: Optional[str] = None,
+    event_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    tags: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> str:
@@ -171,9 +173,7 @@ async def get_recent_news(limit: int = 100, offset: int = 0) -> str:
 
 
 @server.tool(name="news_storage_update_content")
-async def update_news_content(
-    url: str, content: str, html_content: str = ""
-) -> str:
+async def update_news_content(url: str, content: str, html_content: str = "") -> str:
     """更新新闻内容
 
     Args:

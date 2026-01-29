@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
+import aiofiles
 import httpx
 from loguru import logger
 
@@ -39,6 +40,21 @@ class Downloader:
             await self._client.aclose()
             self._client = None
 
+    async def __aenter__(self):
+        """异步上下文管理器入口"""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器退出"""
+        await self.close()
+
+    async def _async_mkdir(self, path: Path):
+        """异步创建目录（如果不存在）"""
+        if not path.exists():
+            # Path.mkdir() 是同步操作，但很快，在线程池中执行
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: path.mkdir(parents=True, exist_ok=True))
+
     async def download(
         self,
         url: str,
@@ -64,7 +80,7 @@ class Downloader:
             save_path = self.settings.default_download_dir
         else:
             save_path = Path(save_path)
-            save_path.mkdir(parents=True, exist_ok=True)
+            await self._async_mkdir(save_path)
 
         # 确定文件名
         if filename is None:
@@ -83,8 +99,9 @@ class Downloader:
             response = await client.get(url)
             response.raise_for_status()
 
-            # 写入文件
-            filepath.write_bytes(response.content)
+            # 异步写入文件
+            async with aiofiles.open(filepath, "wb") as f:
+                await f.write(response.content)
 
             logger.success(f"下载成功: {filepath}")
             return {
@@ -204,15 +221,3 @@ class Downloader:
             logger.warning(f"提取文件名失败: {url} - {e}")
 
         return None
-
-
-# 全局下载器实例
-_downloader: Optional[Downloader] = None
-
-
-def get_downloader() -> Downloader:
-    """获取下载器单例"""
-    global _downloader
-    if _downloader is None:
-        _downloader = Downloader()
-    return _downloader

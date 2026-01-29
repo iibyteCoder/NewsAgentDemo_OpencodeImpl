@@ -28,8 +28,8 @@ class NewsItem:
 
     # 扩展信息
     keywords: List[str] = field(default_factory=list)  # 关键词列表
-    images: List[str] = field(default_factory=list)  # 图片URL列表（支持多个）
-    local_images: List[str] = field(default_factory=list)  # 本地图片路径列表（下载后）
+    image_urls: List[str] = field(default_factory=list)  # 网络图片URL列表（未下载）
+    local_image_paths: List[str] = field(default_factory=list)  # 本地图片文件路径列表（已下载）
     tags: List[str] = field(default_factory=list)  # 标签
 
     # 元数据
@@ -49,8 +49,8 @@ class NewsItem:
             "content": self.content,
             "html_content": self.html_content,
             "keywords": json.dumps(self.keywords, ensure_ascii=False),
-            "images": json.dumps(self.images, ensure_ascii=False),
-            "local_images": json.dumps(self.local_images, ensure_ascii=False),
+            "image_urls": json.dumps(self.image_urls, ensure_ascii=False),
+            "local_image_paths": json.dumps(self.local_image_paths, ensure_ascii=False),
             "tags": json.dumps(self.tags, ensure_ascii=False),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -70,8 +70,8 @@ class NewsItem:
             content=data.get("content", ""),
             html_content=data.get("html_content", ""),
             keywords=json.loads(data.get("keywords", "[]")),
-            images=json.loads(data.get("images", "[]")),
-            local_images=json.loads(data.get("local_images", "[]")),
+            image_urls=json.loads(data.get("image_urls", "[]")),
+            local_image_paths=json.loads(data.get("local_image_paths", "[]")),
             tags=json.loads(data.get("tags", "[]")),
             created_at=data.get("created_at", datetime.now().isoformat()),
             updated_at=data.get("updated_at", datetime.now().isoformat()),
@@ -92,8 +92,8 @@ class NewsItem:
             content,
             html_content,
             keywords,
-            images,
-            local_images,
+            image_urls,
+            local_image_paths,
             tags,
             created_at,
             updated_at,
@@ -110,8 +110,8 @@ class NewsItem:
             content=content or "",
             html_content=html_content or "",
             keywords=json.loads(keywords) if keywords else [],
-            images=json.loads(images) if images else [],
-            local_images=json.loads(local_images) if local_images else [],
+            image_urls=json.loads(image_urls) if image_urls else [],
+            local_image_paths=json.loads(local_image_paths) if local_image_paths else [],
             tags=json.loads(tags) if tags else [],
             created_at=created_at,
             updated_at=updated_at,

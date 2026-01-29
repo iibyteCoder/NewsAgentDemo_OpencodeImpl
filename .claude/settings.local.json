@@ -19,7 +19,12 @@
       "Bash(git add:*)",
       "Bash(powershell:*)",
       "Bash(git commit:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(where:*)",
+      "Bash(dir:*)",
+      "Bash(Get-ChildItem -Path \"d:\\\\myprojects\\\\PythonProjects\\\\LearningProjects\\\\OpencodeTest_1\" -Filter *.py -Recurse -File)",
+      "Bash(Select-Object:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

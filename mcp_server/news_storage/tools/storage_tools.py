@@ -21,8 +21,8 @@ async def save_news_tool(
     content: str = "",
     html_content: str = "",
     keywords: str = "[]",
-    images: str = "[]",
-    local_images: str = "[]",
+    image_urls: str = "[]",
+    local_image_paths: str = "[]",
     tags: str = "[]",
 ) -> str:
     """保存单条新闻 - 💾 自动去重（基于URL）
@@ -31,7 +31,7 @@ async def save_news_tool(
     - 保存新闻的完整信息到SQLite数据库
     - 自动检测URL是否已存在，存在则更新
     - 支持保存标题、摘要、来源、时间、内容等完整信息
-    - 支持关键词、图片URL（多个）、本地图片路径（多个）、标签等扩展信息
+    - 支持关键词、网络图片URL、本地图片文件路径、标签等扩展信息
     - 支持事件名称归类
 
     Args:
@@ -45,8 +45,8 @@ async def save_news_tool(
         content: 完整内容-纯文本（可选）
         html_content: HTML内容（原文）（可选）
         keywords: 关键词JSON数组（可选，如 '["AI", "技术"]'）
-        images: 图片URL JSON数组（可选，支持多个图片）
-        local_images: 本地图片路径 JSON数组（可选，支持多个）
+        image_urls: 网络图片URL JSON数组（可选，支持多个，如 '["https://example.com/img1.jpg", "https://example.com/img2.jpg"]'）
+        local_image_paths: 本地图片文件路径JSON数组（可选，支持多个，如 '["./data/images/img1.jpg", "./data/images/img2.jpg"]'）
         tags: 标签 JSON数组（可选）
 
     Returns:
@@ -74,18 +74,20 @@ async def save_news_tool(
         ...     content="完整的新闻内容...",
         ...     html_content="<p>HTML原文</p>",
         ...     keywords='["AI", "技术"]',
-        ...     images='["https://example.com/img1.jpg", "https://example.com/img2.jpg"]',
-        ...     local_images='["./report/images/img1.jpg", "./report/images/img2.jpg"]',
+        ...     image_urls='["https://example.com/img1.jpg", "https://example.com/img2.jpg"]',
+        ...     local_image_paths='["./report/images/img1.jpg", "./report/images/img2.jpg"]',
         ...     tags='["科技", "前沿"]'
         ... )
     """
     try:
-        db = get_database()
+        db = await get_database()
 
         # 解析JSON字段
         keywords_list = json.loads(keywords) if keywords else []
-        images_list = json.loads(images) if images else []
-        local_images_list = json.loads(local_images) if local_images else []
+        image_urls_list = json.loads(image_urls) if image_urls else []
+        local_image_paths_list = (
+            json.loads(local_image_paths) if local_image_paths else []
+        )
         tags_list = json.loads(tags) if tags else []
 
         # 创建新闻对象
@@ -100,13 +102,13 @@ async def save_news_tool(
             content=content,
             html_content=html_content,
             keywords=keywords_list,
-            images=images_list,
-            local_images=local_images_list,
+            image_urls=image_urls_list,
+            local_image_paths=local_image_paths_list,
             tags=tags_list,
         )
 
         # 保存
-        is_new = db.save_news(news)
+        is_new = await db.save_news(news)
 
         action = "inserted" if is_new else "updated"
         message = f"新闻已{action}" if is_new else "新闻已更新"
@@ -165,7 +167,7 @@ async def save_news_batch_tool(news_list: str) -> str:
         >>> save_news_batch_tool(news_data)
     """
     try:
-        db = get_database()
+        db = await get_database()
 
         # 解析新闻列表
         news_data = json.loads(news_list)
@@ -182,14 +184,14 @@ async def save_news_batch_tool(news_list: str) -> str:
                 content=item.get("content", ""),
                 html_content=item.get("html_content", ""),
                 keywords=item.get("keywords", []),
-                images=item.get("images", []),
-                local_images=item.get("local_images", []),
+                image_urls=item.get("image_urls", []),
+                local_image_paths=item.get("local_image_paths", []),
                 tags=item.get("tags", []),
             )
             news_items.append(news)
 
         # 批量保存
-        stats = db.save_news_batch(news_items)
+        stats = await db.save_news_batch(news_items)
 
         result = {
             "success": True,
@@ -226,8 +228,8 @@ async def get_news_by_url_tool(url: str) -> str:
         >>> get_news_by_url_tool("https://example.com/news/123")
     """
     try:
-        db = get_database()
-        news = db.get_news_by_url(url)
+        db = await get_database()
+        news = await db.get_news_by_url(url)
 
         if news:
             result = {
@@ -316,7 +318,7 @@ async def search_news_tool(
         ... )
     """
     try:
-        db = get_database()
+        db = await get_database()
 
         # 自动分词：按空格分割搜索词
         search_terms = None
@@ -340,7 +342,7 @@ async def search_news_tool(
         )
 
         # 搜索
-        results = db.search_news(search_filter)
+        results = await db.search_news(search_filter)
 
         result = {
             "success": True,
@@ -389,8 +391,8 @@ async def get_recent_news_tool(limit: int = 100, offset: int = 0) -> str:
         >>> get_recent_news_tool(limit=20, offset=20)  # 第2页
     """
     try:
-        db = get_database()
-        results = db.get_recent_news(limit, offset)
+        db = await get_database()
+        results = await db.get_recent_news(limit, offset)
 
         result = {
             "success": True,
@@ -433,8 +435,8 @@ async def update_news_content_tool(
         ... )
     """
     try:
-        db = get_database()
-        success = db.update_news_content(url, content, html_content)
+        db = await get_database()
+        success = await db.update_news_content(url, content, html_content)
 
         result = {
             "success": success,
@@ -472,8 +474,8 @@ async def delete_news_tool(url: str) -> str:
         >>> delete_news_tool("https://example.com/news/123")
     """
     try:
-        db = get_database()
-        success = db.delete_news(url)
+        db = await get_database()
+        success = await db.delete_news(url)
 
         result = {
             "success": success,
@@ -508,8 +510,8 @@ async def get_news_stats_tool() -> str:
         >>> get_news_stats_tool()
     """
     try:
-        db = get_database()
-        stats = db.get_stats()
+        db = await get_database()
+        stats = await db.get_stats()
 
         result = {
             "success": True,
@@ -549,8 +551,8 @@ async def update_event_name_tool(url: str, event_name: str) -> str:
         ... )
     """
     try:
-        db = get_database()
-        success = db.update_event_name(url, event_name)
+        db = await get_database()
+        success = await db.update_event_name(url, event_name)
 
         result = {
             "success": success,
@@ -600,7 +602,7 @@ async def batch_update_event_name_tool(urls: str, event_name: str) -> str:
         ... )
     """
     try:
-        db = get_database()
+        db = await get_database()
         url_list = json.loads(urls) if urls else []
 
         if not url_list:
@@ -610,7 +612,7 @@ async def batch_update_event_name_tool(urls: str, event_name: str) -> str:
                 indent=2,
             )
 
-        stats = db.batch_update_event_name(url_list, event_name)
+        stats = await db.batch_update_event_name(url_list, event_name)
 
         result = {
             "success": True,
@@ -628,4 +630,3 @@ async def batch_update_event_name_tool(urls: str, event_name: str) -> str:
         return json.dumps(
             {"success": False, "error": str(e)}, ensure_ascii=False, indent=2
         )
-

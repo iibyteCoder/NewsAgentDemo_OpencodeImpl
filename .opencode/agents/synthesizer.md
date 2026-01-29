@@ -37,16 +37,13 @@ hidden: true
 
 - `news-storage_search_news_tool`: 按事件名称搜索新闻
   - 参数：`event_name="事件名称"`, `limit=100`
-  - **返回该事件的所有新闻数据**，包括：title, url, summary, content, source, publish_time, images, local_images 等
+  - **返回该事件的所有新闻数据**，包括：title, url, summary, content, source, publish_time, image_urls, local_image_paths 等
 
 - `news-storage_get_news_by_url_tool`: 获取单条新闻详情
 
-- `news-storage_get_recent_news_tool`: 获取最近的新闻
-
-- `news-storage_save_news_tool`: 更新新闻的本地图片路径 ⭐ 重要！
-  - 参数：`url`, `local_images='["path1", "path2"]'`
-  - **用途**：下载图片后，更新数据库中的本地路径
-  - 这样可以记录哪些图片已经下载到本地
+- `news-storage_save_news_tool`: 更新新闻的本地图片路径 ⭐
+  - 参数：`url`, `local_image_paths='["path1", "path2"]'`
+  - 下载图片后，用此工具更新数据库中的本地路径
 
 ### 图片下载工具
 
@@ -68,7 +65,7 @@ hidden: true
 
 - **必须从数据库读取新闻数据** - 不要使用上下文传递的数据
 - **必须下载图片到本地** - 不要使用原始URL
-- **必须更新数据库** - 下载后使用 `news-storage_save_news_tool` 更新 `local_images` 字段
+- **必须更新数据库** - 下载后使用 `news-storage_save_news_tool` 更新 `local_image_paths` 字段
 - **使用相对路径引用图片** - 确保报告可以离线查看
 
 ## 工作流程
@@ -104,10 +101,10 @@ output/report_20260129_143000/
    news-storage_search_news_tool(event_name="美国大选2026", limit=100)
    ```
 
-   这会返回完整的新闻数据，包括 images（图片URL列表）
+   这会返回完整的新闻数据，包括 image_urls（图片URL列表）
 
 2. **下载图片到本地** ⭐
-   - 提取所有新闻的 `images` 字段，合并所有图片URL
+   - 提取所有新闻的 `image_urls` 字段，合并所有图片URL
    - 去重（避免重复下载）
    - **为每个事件创建独立的图片文件夹**：
 
@@ -126,7 +123,7 @@ output/report_20260129_143000/
 
 3. **更新数据库中的本地图片路径** ⭐ 新增！
    - 为每条新闻匹配其下载成功的图片
-   - 使用 `news-storage_save_news_tool` 更新 `local_images` 字段
+   - 使用 `news-storage_save_news_tool` 更新 `local_image_paths` 字段
    - 这样可以记录哪些图片已经下载到本地
 
    ```bash
@@ -134,7 +131,7 @@ output/report_20260129_143000/
    news-storage_save_news_tool(
        title="新闻标题",
        url="新闻URL",
-       local_images='["./output/report_20260129_143000/体育新闻/2026-01-29/资讯汇总与摘要/事件1/img1.jpg"]'
+       local_image_paths='["./output/report_20260129_143000/体育新闻/2026-01-29/资讯汇总与摘要/事件1/img1.jpg"]'
    )
    ```
 
@@ -143,7 +140,7 @@ output/report_20260129_143000/
    - **摘要**：从数据库读取的 summary
    - **来源**：列出所有新闻的 title, url, source, publish_time
    - **内容**：使用数据库中的真实 content
-   - **图片**：使用 `local_images` 字段中的本地路径（如果为空则使用原始URL）
+   - **图片**：使用 `local_image_paths` 字段中的本地路径（如果为空则使用原始URL）
    - **验证结果**：使用分析阶段生成的验证数据
    - **时间轴**：使用分析阶段生成的时间轴
    - **预测**：使用分析阶段生成的预测
@@ -203,17 +200,17 @@ read("templates/report_structure_template.md")
 news-storage_search_news_tool(event_name="事件名称", limit=100)
 
 # 步骤2：提取所有图片URL并去重
-all_images = []
+all_image_urls = []
 for news in results:
-    all_images.extend(news["images"])
-unique_images = list(set(all_images))  # 去重
+    all_image_urls.extend(news["image_urls"])
+unique_image_urls = list(set(all_image_urls))  # 去重
 
 # 步骤3：为每个事件创建独立的图片目录
 mkdir -p ./output/report_YYYYMMDD_HHMMSS/{分类}/{日期}/资讯汇总与摘要/事件1/
 
 # 步骤4：批量下载图片
 download_result = downloader_download_files(
-    urls=unique_images,
+    urls=unique_image_urls,
     save_path="./output/report_YYYYMMDD_HHMMSS/{分类}/{日期}/资讯汇总与摘要/事件1/"
 )
 
@@ -229,23 +226,23 @@ for result in download_result["results"]:
 # 步骤6：更新数据库中的本地图片路径
 for news in results:
     # 为每条新闻匹配其下载成功的图片
-    local_images_for_news = []
-    for img_url in news["images"]:
+    local_image_paths_for_news = []
+    for img_url in news["image_urls"]:
         match = next((item["local_path"] for item in successful_downloads if item["url"] == img_url), None)
         if match:
-            local_images_for_news.append(match)
+            local_image_paths_for_news.append(match)
 
     # 更新数据库
     news-storage_save_news_tool(
         title=news["title"],
         url=news["url"],
-        local_images=json.dumps(local_images_for_news)
+        local_image_paths=json.dumps(local_image_paths_for_news)
     )
 ```
 
 ### 2. 图片引用方式
 
-在事件报告中使用数据库中的 `local_images` 字段：
+在事件报告中使用数据库中的 `local_image_paths` 字段：
 
 ```markdown
 ## 📸 相关图片
@@ -259,8 +256,8 @@ for news in results:
 
 **关键**：
 
-- 优先使用 `local_images` 字段（本地路径）
-- 如果 `local_images` 为空，降级使用 `images` 字段（原始URL）并在报告中标注"图片未下载"
+- 优先使用 `local_image_paths` 字段（本地路径）
+- 如果 `local_image_paths` 为空，降级使用 `image_urls` 字段（原始URL）并在报告中标注"图片未下载"
 
 ### 3. 图片命名规范
 
@@ -333,11 +330,11 @@ for news in results:
       "publish_time": "2026-01-29",
       "content": "完整的新闻正文内容...",
       "html_content": "<p>HTML内容</p>",
-      "images": [
+      "image_urls": [
         "https://example.com/img1.jpg",
         "https://example.com/img2.jpg"
       ],
-      "local_images": [],
+      "local_image_paths": [],
       "keywords": ["AI", "技术"],
       "tags": ["科技", "前沿"],
       "created_at": "2026-01-29T10:30:00"
@@ -348,7 +345,7 @@ for news in results:
 
 **注意**：
 
-- `images` 字段包含原始图片URL
+- `image_urls` 字段包含原始图片URL
 - `content` 字段包含完整的新闻正文
 - 所有数据都是真实的，来自数据库
 
