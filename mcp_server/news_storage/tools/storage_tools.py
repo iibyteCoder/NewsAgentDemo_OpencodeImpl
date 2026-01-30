@@ -13,6 +13,8 @@ from ..core.models import NewsItem, SearchFilter
 async def save_news_tool(
     title: str,
     url: str,
+    session_id: str,
+    category: str,
     summary: str = "",
     source: str = "",
     publish_time: str = "",
@@ -107,8 +109,8 @@ async def save_news_tool(
             tags=tags_list,
         )
 
-        # 保存
-        is_new = await db.save_news(news)
+        # 保存（传入 session_id 和 category）
+        is_new = await db.save_news(news, session_id=session_id, category=category)
 
         action = "inserted" if is_new else "updated"
         message = f"新闻已{action}" if is_new else "新闻已更新"
@@ -211,7 +213,9 @@ async def save_news_batch_tool(news_list: str) -> str:
         )
 
 
-async def get_news_by_url_tool(url: str) -> str:
+async def get_news_by_url_tool(
+    url: str, session_id: str = "", category: str = ""
+) -> str:
     """根据URL获取新闻 - 🔍 精确查询
 
     功能：
@@ -229,7 +233,7 @@ async def get_news_by_url_tool(url: str) -> str:
     """
     try:
         db = await get_database()
-        news = await db.get_news_by_url(url)
+        news = await db.get_news_by_url(url, session_id=session_id, category=category)
 
         if news:
             result = {
@@ -256,9 +260,11 @@ async def get_news_by_url_tool(url: str) -> str:
 
 
 async def search_news_tool(
+    session_id: str,
     search: Optional[str] = None,
     source: Optional[str] = None,
     event_name: Optional[str] = None,
+    category: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     tags: Optional[str] = None,
@@ -331,6 +337,8 @@ async def search_news_tool(
 
         # 构建过滤器
         search_filter = SearchFilter(
+            session_id=session_id,
+            category=category or "",
             search_terms=search_terms,
             source=source,
             event_name=event_name,
@@ -344,22 +352,44 @@ async def search_news_tool(
         # 搜索
         results = await db.search_news(search_filter)
 
+        # 转换为轻量级数据（不包含 content 和 html_content）
+        lightweight_results = []
+        for news in results:
+            lightweight_results.append(
+                {
+                    "title": news.title,
+                    "url": news.url,
+                    "summary": news.summary,
+                    "source": news.source,
+                    "publish_time": news.publish_time,
+                    "author": news.author,
+                    "event_name": news.event_name,
+                    "keywords": news.keywords,
+                    "image_urls": news.image_urls,
+                    "local_image_paths": news.local_image_paths,
+                    "tags": news.tags,
+                    "created_at": news.created_at,
+                }
+            )
+
         result = {
             "success": True,
-            "count": len(results),
-            "results": [news.to_dict() for news in results],
+            "count": len(lightweight_results),
+            "results": lightweight_results,
             "filters": {
                 "search": search,
                 "search_terms": search_terms,
                 "source": source,
                 "event_name": event_name,
+                "category": category,
                 "start_date": start_date,
                 "end_date": end_date,
                 "tags": tags_list,
             },
+            "note": "结果不包含 content 和 html_content，需要时请使用 news_storage_get_by_url 获取完整内容",
         }
 
-        logger.info(f"✅ 搜索完成: 找到 {len(results)} 条结果")
+        logger.info(f"✅ 搜索完成: 找到 {len(lightweight_results)} 条结果")
         return json.dumps(result, ensure_ascii=False, indent=2)
 
     except Exception as e:
@@ -369,38 +399,63 @@ async def search_news_tool(
         )
 
 
-async def get_recent_news_tool(limit: int = 100, offset: int = 0) -> str:
-    """获取最近添加的新闻 - 📰 最新资讯
+async def get_recent_news_tool(
+    session_id: str, limit: int = 100, offset: int = 0
+) -> str:
+    """获取最近添加的新闻（轻量级，不包含 content）- 📰 最新资讯
 
     功能：
     - 获取最近添加的新闻列表
     - 按添加时间倒序排列
     - 支持分页
+    - 返回轻量级数据（不含 content 和 html_content）
 
     Args:
+        session_id: 会话ID（必填）
         limit: 返回数量（默认100）
         offset: 偏移量（默认0，用于分页）
 
     Returns:
-        JSON格式的新闻列表
+        JSON格式的新闻列表（轻量级）
 
     Examples:
         >>> # 获取最近100条新闻
-        >>> get_recent_news_tool(limit=100)
+        >>> get_recent_news_tool(session_id="xxx", limit=100)
         >>> # 分页获取
-        >>> get_recent_news_tool(limit=20, offset=20)  # 第2页
+        >>> get_recent_news_tool(session_id="xxx", limit=20, offset=20)  # 第2页
     """
     try:
         db = await get_database()
-        results = await db.get_recent_news(limit, offset)
+        results = await db.get_recent_news(limit, offset, session_id=session_id)
+
+        # 转换为轻量级数据（不包含 content 和 html_content）
+        lightweight_results = []
+        for news in results:
+            lightweight_results.append(
+                {
+                    "title": news.title,
+                    "url": news.url,
+                    "summary": news.summary,
+                    "source": news.source,
+                    "publish_time": news.publish_time,
+                    "author": news.author,
+                    "event_name": news.event_name,
+                    "keywords": news.keywords,
+                    "image_urls": news.image_urls,
+                    "local_image_paths": news.local_image_paths,
+                    "tags": news.tags,
+                    "created_at": news.created_at,
+                }
+            )
 
         result = {
             "success": True,
-            "count": len(results),
-            "results": [news.to_dict() for news in results],
+            "count": len(lightweight_results),
+            "results": lightweight_results,
+            "note": "结果不包含 content 和 html_content，需要时请使用 news_storage_get_by_url 获取完整内容",
         }
 
-        logger.info(f"✅ 获取最近新闻: {len(results)} 条")
+        logger.info(f"✅ 获取最近新闻: {len(lightweight_results)} 条")
         return json.dumps(result, ensure_ascii=False, indent=2)
 
     except Exception as e:
@@ -496,7 +551,7 @@ async def delete_news_tool(url: str) -> str:
         )
 
 
-async def get_news_stats_tool() -> str:
+async def get_news_stats_tool(session_id: str = "") -> str:
     """获取统计信息 - 📊 数据概览
 
     功能：
@@ -511,7 +566,7 @@ async def get_news_stats_tool() -> str:
     """
     try:
         db = await get_database()
-        stats = await db.get_stats()
+        stats = await db.get_stats(session_id=session_id)
 
         result = {
             "success": True,

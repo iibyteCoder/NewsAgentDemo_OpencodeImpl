@@ -64,6 +64,8 @@ class NewsDatabase:
                 image_urls TEXT,
                 local_image_paths TEXT,
                 tags TEXT,
+                session_id TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -84,15 +86,27 @@ class NewsDatabase:
         await cursor.execute(
             """CREATE INDEX IF NOT EXISTS idx_news_event_name ON news(event_name)"""
         )
+        # 新增索引：会话和类别
+        await cursor.execute(
+            """CREATE INDEX IF NOT EXISTS idx_news_session ON news(session_id)"""
+        )
+        await cursor.execute(
+            """CREATE INDEX IF NOT EXISTS idx_news_category ON news(category)"""
+        )
+        await cursor.execute(
+            """CREATE INDEX IF NOT EXISTS idx_news_session_category ON news(session_id, category)"""
+        )
 
         await self.conn.commit()
         logger.debug("📊 数据表创建完成")
 
-    async def save_news(self, news: NewsItem) -> bool:
+    async def save_news(self, news: NewsItem, session_id: str = "", category: str = "") -> bool:
         """保存单条新闻（自动去重）
 
         Args:
             news: 新闻对象
+            session_id: 会话ID
+            category: 类别
 
         Returns:
             是否插入新记录（False表示更新已存在记录）
@@ -101,11 +115,17 @@ class NewsDatabase:
         cursor = await conn.cursor()
 
         try:
-            # 检查是否已存在
-            await cursor.execute("SELECT id FROM news WHERE url = ?", (news.url,))
+            # 检查是否已存在（在同一会话和类别下）
+            await cursor.execute(
+                "SELECT id FROM news WHERE url = ? AND session_id = ? AND category = ?",
+                (news.url, session_id, category),
+            )
             existing = await cursor.fetchone()
 
             news_dict = news.to_dict()
+            # 覆盖 session_id 和 category
+            news_dict["session_id"] = session_id
+            news_dict["category"] = category
 
             if existing:
                 # 更新
@@ -114,8 +134,9 @@ class NewsDatabase:
                     UPDATE news
                     SET title = ?, summary = ?, source = ?, publish_time = ?,
                         author = ?, event_name = ?, content = ?, html_content = ?,
-                        keywords = ?, image_urls = ?, local_image_paths = ?, tags = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE url = ?
+                        keywords = ?, image_urls = ?, local_image_paths = ?, tags = ?,
+                        session_id = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE url = ? AND session_id = ? AND category = ?
                     """,
                     (
                         news_dict["title"],
@@ -130,7 +151,11 @@ class NewsDatabase:
                         news_dict["image_urls"],
                         news_dict["local_image_paths"],
                         news_dict["tags"],
+                        session_id,
+                        category,
                         news.url,
+                        session_id,
+                        category,
                     ),
                 )
                 logger.debug(f"📝 更新新闻: {news.title[:50]}")
@@ -142,8 +167,9 @@ class NewsDatabase:
                     """
                     INSERT INTO news (
                         title, url, summary, source, publish_time, author, event_name,
-                        content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        content, html_content, keywords, image_urls, local_image_paths, tags,
+                        session_id, category, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         news_dict["title"],
@@ -159,6 +185,8 @@ class NewsDatabase:
                         news_dict["image_urls"],
                         news_dict["local_image_paths"],
                         news_dict["tags"],
+                        session_id,
+                        category,
                         news_dict["created_at"],
                         news_dict["updated_at"],
                     ),
@@ -199,25 +227,42 @@ class NewsDatabase:
         logger.info(f"📊 批量保存完成: {result}")
         return result
 
-    async def get_news_by_url(self, url: str) -> Optional[NewsItem]:
+    async def get_news_by_url(
+        self, url: str, session_id: str = "", category: str = ""
+    ) -> Optional[NewsItem]:
         """根据URL获取新闻
 
         Args:
             url: 新闻URL
+            session_id: 会话ID（可选，用于精确查询）
+            category: 类别（可选，用于精确查询）
 
         Returns:
             新闻对象，不存在则返回None
         """
         conn = await self._ensure_connection()
         cursor = await conn.cursor()
-        await cursor.execute(
-            """
-            SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
-            FROM news WHERE url = ?
-            """,
-            (url,),
-        )
+
+        if session_id and category:
+            await cursor.execute(
+                """
+                SELECT id, title, url, summary, source, publish_time, author, event_name,
+                       content, html_content, keywords, image_urls, local_image_paths, tags,
+                       session_id, category, created_at, updated_at
+                FROM news WHERE url = ? AND session_id = ? AND category = ?
+                """,
+                (url, session_id, category),
+            )
+        else:
+            await cursor.execute(
+                """
+                SELECT id, title, url, summary, source, publish_time, author, event_name,
+                       content, html_content, keywords, image_urls, local_image_paths, tags,
+                       session_id, category, created_at, updated_at
+                FROM news WHERE url = ?
+                """,
+                (url,),
+            )
 
         row = await cursor.fetchone()
         if row:
@@ -225,10 +270,10 @@ class NewsDatabase:
         return None
 
     async def search_news(self, filter: SearchFilter) -> List[NewsItem]:
-        """搜索新闻
+        """搜索新闻（自动过滤会话和类别）
 
         Args:
-            filter: 搜索过滤器
+            filter: 搜索过滤器（必须包含 session_id）
 
         Returns:
             新闻列表
@@ -239,6 +284,18 @@ class NewsDatabase:
         # 构建SQL查询
         conditions = []
         params = []
+
+        # 强制添加会话过滤
+        if not filter.session_id:
+            logger.warning("⚠️ 搜索时未提供 session_id，可能返回所有数据")
+        else:
+            conditions.append("session_id = ?")
+            params.append(filter.session_id)
+
+        # 添加类别过滤
+        if filter.category:
+            conditions.append("category = ?")
+            params.append(filter.category)
 
         # 智能搜索：每个词在所有字段中独立搜索（OR关系）
         if filter.search_terms:
@@ -295,7 +352,8 @@ class NewsDatabase:
         # 执行查询
         query = f"""
             SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
+                   content, html_content, keywords, image_urls, local_image_paths, tags,
+                   session_id, category, created_at, updated_at
             FROM news
             {where_clause}
             ORDER BY created_at DESC
@@ -310,29 +368,46 @@ class NewsDatabase:
         return [NewsItem.from_db_row(row) for row in rows]
 
     async def get_recent_news(
-        self, limit: int = 100, offset: int = 0
+        self, limit: int = 100, offset: int = 0, session_id: str = ""
     ) -> List[NewsItem]:
         """获取最近添加的新闻
 
         Args:
             limit: 返回数量
             offset: 偏移量
+            session_id: 会话ID（可选，提供则只返回该会话的新闻）
 
         Returns:
             新闻列表
         """
         conn = await self._ensure_connection()
         cursor = await conn.cursor()
-        await cursor.execute(
-            """
-            SELECT id, title, url, summary, source, publish_time, author, event_name,
-                   content, html_content, keywords, image_urls, local_image_paths, tags, created_at, updated_at
-            FROM news
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-            """,
-            (limit, offset),
-        )
+
+        if session_id:
+            await cursor.execute(
+                """
+                SELECT id, title, url, summary, source, publish_time, author, event_name,
+                       content, html_content, keywords, image_urls, local_image_paths, tags,
+                       session_id, category, created_at, updated_at
+                FROM news
+                WHERE session_id = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (session_id, limit, offset),
+            )
+        else:
+            await cursor.execute(
+                """
+                SELECT id, title, url, summary, source, publish_time, author, event_name,
+                       content, html_content, keywords, image_urls, local_image_paths, tags,
+                       session_id, category, created_at, updated_at
+                FROM news
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
+            )
 
         rows = await cursor.fetchall()
         return [NewsItem.from_db_row(row) for row in rows]
@@ -448,8 +523,11 @@ class NewsDatabase:
 
         return success
 
-    async def get_stats(self) -> dict:
+    async def get_stats(self, session_id: str = "") -> dict:
         """获取统计信息
+
+        Args:
+            session_id: 会话ID（可选，提供则只统计该会话）
 
         Returns:
             统计数据
@@ -458,28 +536,53 @@ class NewsDatabase:
         cursor = await conn.cursor()
 
         # 总数
-        await cursor.execute("SELECT COUNT(*) FROM news")
+        if session_id:
+            await cursor.execute("SELECT COUNT(*) FROM news WHERE session_id = ?", (session_id,))
+        else:
+            await cursor.execute("SELECT COUNT(*) FROM news")
         total = (await cursor.fetchone())[0]
 
         # 按来源统计
-        await cursor.execute(
+        if session_id:
+            await cursor.execute(
+                """
+                SELECT source, COUNT(*) as count
+                FROM news
+                WHERE session_id = ?
+                GROUP BY source
+                ORDER BY count DESC
+                LIMIT 10
+            """,
+                (session_id,),
+            )
+        else:
+            await cursor.execute(
+                """
+                SELECT source, COUNT(*) as count
+                FROM news
+                GROUP BY source
+                ORDER BY count DESC
+                LIMIT 10
             """
-            SELECT source, COUNT(*) as count
-            FROM news
-            GROUP BY source
-            ORDER BY count DESC
-            LIMIT 10
-        """
-        )
+            )
         by_source = {row[0]: row[1] for row in await cursor.fetchall()}
 
         # 最近7天添加数量
-        await cursor.execute(
+        if session_id:
+            await cursor.execute(
+                """
+                SELECT COUNT(*) FROM news
+                WHERE session_id = ? AND created_at >= datetime('now', '-7 days')
+            """,
+                (session_id,),
+            )
+        else:
+            await cursor.execute(
+                """
+                SELECT COUNT(*) FROM news
+                WHERE created_at >= datetime('now', '-7 days')
             """
-            SELECT COUNT(*) FROM news
-            WHERE created_at >= datetime('now', '-7 days')
-        """
-        )
+            )
         recent_week = (await cursor.fetchone())[0]
 
         return {
@@ -488,6 +591,165 @@ class NewsDatabase:
             "recent_week": recent_week,
             "db_path": str(self.db_path),
         }
+
+    async def get_categories(self, session_id: str) -> List[dict]:
+        """获取会话中的所有类别及统计
+
+        Args:
+            session_id: 会话ID
+
+        Returns:
+            类别列表：[{"name": "科技", "count": 85, "events": 12}, ...]
+        """
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+
+        await cursor.execute(
+            """
+            SELECT
+                category,
+                COUNT(*) as count,
+                COUNT(DISTINCT event_name) as events
+            FROM news
+            WHERE session_id = ?
+            GROUP BY category
+            ORDER BY count DESC
+        """,
+            (session_id,),
+        )
+
+        rows = await cursor.fetchall()
+        return [
+            {"name": row[0], "count": row[1], "events": row[2]} for row in rows
+        ]
+
+    async def get_events_by_category(
+        self, session_id: str, category: str, limit: int = 20
+    ) -> List[dict]:
+        """获取类别下的事件列表
+
+        Args:
+            session_id: 会话ID
+            category: 类别名称
+            limit: 最大返回数量
+
+        Returns:
+            事件列表
+        """
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+
+        await cursor.execute(
+            """
+            SELECT
+                event_name,
+                COUNT(*) as news_count,
+                MAX(publish_time) as latest_time,
+                GROUP_CONCAT(DISTINCT source) as sources
+            FROM news
+            WHERE session_id = ? AND category = ?
+            GROUP BY event_name
+            ORDER BY latest_time DESC
+            LIMIT ?
+        """,
+            (session_id, category, limit),
+        )
+
+        rows = await cursor.fetchall()
+        return [
+            {
+                "event_name": row[0],
+                "news_count": row[1],
+                "latest_time": row[2],
+                "sources": (row[3] or "").split(",") if row[3] else [],
+            }
+            for row in rows
+        ]
+
+    async def get_news_titles_by_event(
+        self, session_id: str, event_name: str, limit: int = 50
+    ) -> List[dict]:
+        """获取事件下的新闻标题列表（轻量级）
+
+        Args:
+            session_id: 会话ID
+            event_name: 事件名称
+            limit: 最大返回数量
+
+        Returns:
+            新闻列表（轻量级，包含图片URL）
+        """
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+
+        await cursor.execute(
+            """
+            SELECT
+                title, url, summary, source, publish_time, author, image_urls
+            FROM news
+            WHERE session_id = ? AND event_name = ?
+            ORDER BY publish_time DESC
+            LIMIT ?
+        """,
+            (session_id, event_name, limit),
+        )
+
+        rows = await cursor.fetchall()
+        return [
+            {
+                "title": row[0],
+                "url": row[1],
+                "summary": row[2] or "",
+                "source": row[3] or "",
+                "publish_time": row[4] or "",
+                "author": row[5] or "",
+                "image_urls": json.loads(row[6]) if row[6] else [],
+            }
+            for row in rows
+        ]
+
+    async def get_images_by_event(
+        self, session_id: str, event_name: str
+    ) -> List[dict]:
+        """获取事件下所有新闻的图片URL
+
+        Args:
+            session_id: 会话ID
+            event_name: 事件名称
+
+        Returns:
+            图片列表：[{url, source_news_title, source_news_url}, ...]
+        """
+        conn = await self._ensure_connection()
+        cursor = await conn.cursor()
+
+        await cursor.execute(
+            """
+            SELECT
+                title, url, image_urls
+            FROM news
+            WHERE session_id = ? AND event_name = ? AND image_urls IS NOT NULL AND image_urls != '[]'
+        """,
+            (session_id, event_name),
+        )
+
+        rows = await cursor.fetchall()
+        images = []
+
+        for row in rows:
+            title, url, image_urls_json = row
+            if image_urls_json:
+                image_urls = json.loads(image_urls_json)
+                for img_url in image_urls:
+                    images.append(
+                        {
+                            "url": img_url,
+                            "source_news_title": title,
+                            "source_news_url": url,
+                        }
+                    )
+
+        return images
 
     async def close(self):
         """关闭数据库连接"""

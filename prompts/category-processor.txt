@@ -29,18 +29,39 @@
 
 ### 数据存储工具 ⭐ 核心！
 
-- `news-storage_save_news_tool`: 保存单条新闻到数据库
+**重要**：所有数据库工具都需要传入 `session_id` 和 `category` 参数！
+
+- `news-storage_save`: 保存单条新闻到数据库
   - **必须使用**：搜索到的每条新闻都要保存！
-  - 参数：title, url, summary, source, publish_time, content, html_content, images, local_images
-  - **images**: 图片URL列表（从网页提取的原始URL）
-  - **local_images**: 本地图片路径列表（下载后的本地路径，由synthesizer智能体填写）
+  - 参数：title, url, session_id（必填）, category（必填）, summary, source, publish_time, content, html_content, keywords, image_urls, local_image_paths, tags
+  - **session_id**: 会话ID（整个对话过程中保持不变）
+  - **category**: 类别名称（如"体育"、"科技"等）
+  - **image_urls**: 图片URL列表（从网页提取的原始URL）
+  - **local_image_paths**: 本地图片路径列表（下载后的本地路径）
 
-- `news-storage_search_news_tool`: 从数据库读取新闻
-  - 参数：keyword, event_name, source, limit
+- `news-storage_search`: 从数据库搜索新闻
+  - 参数：session_id（必填）, search, category（可选）, source, event_name, tags, limit, offset
+  - 自动过滤 session_id，不会返回其他会话的数据
 
-- `news-storage_get_recent_news_tool`: 获取最近的新闻
+- `news-storage_get_recent`: 获取最近的新闻
+  - 参数：session_id（必填）, limit, offset
 
-- `news-storage_update_event_name_tool`: 更新新闻的事件名称
+- `news-storage_update_event_name`: 更新新闻的事件名称
+  - 参数：url, event_name
+
+### 分层导航工具（新增⭐）
+
+用于渐进式探索数据库：
+
+1. `news-storage_list_categories(session_id)` - 列出所有类别
+2. `news-storage_list_events_by_category(session_id, category)` - 列出类别下的事件
+3. `news-storage_list_news_by_event(session_id, event_name)` - 列出事件下的新闻
+4. `news-storage_get_by_url(url, session_id, category)` - 获取新闻详情
+
+**使用流程**：
+```
+list_categories → 选择类别 → list_events_by_category → 选择事件 → list_news_by_event → 选择新闻 → get_by_url
+```
 
 ### 图片下载工具
 

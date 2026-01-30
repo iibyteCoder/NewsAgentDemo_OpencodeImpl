@@ -22,6 +22,10 @@ class NewsItem:
     author: str = ""  # 作者
     event_name: str = ""  # 事件名称
 
+    # 会话和分类
+    session_id: str = ""  # 会话ID
+    category: str = ""  # 类别（科技/体育/财经/...）
+
     # 内容
     content: str = ""  # 完整内容（纯文本）
     html_content: str = ""  # HTML内容（原文）
@@ -46,6 +50,8 @@ class NewsItem:
             "publish_time": self.publish_time,
             "author": self.author,
             "event_name": self.event_name,
+            "session_id": self.session_id,
+            "category": self.category,
             "content": self.content,
             "html_content": self.html_content,
             "keywords": json.dumps(self.keywords, ensure_ascii=False),
@@ -67,6 +73,8 @@ class NewsItem:
             publish_time=data.get("publish_time", ""),
             author=data.get("author", ""),
             event_name=data.get("event_name", ""),
+            session_id=data.get("session_id", ""),
+            category=data.get("category", ""),
             content=data.get("content", ""),
             html_content=data.get("html_content", ""),
             keywords=json.loads(data.get("keywords", "[]")),
@@ -95,6 +103,8 @@ class NewsItem:
             image_urls,
             local_image_paths,
             tags,
+            session_id,
+            category,
             created_at,
             updated_at,
         ) = row
@@ -107,6 +117,8 @@ class NewsItem:
             publish_time=publish_time or "",
             author=author or "",
             event_name=event_name or "",
+            session_id=session_id or "",
+            category=category or "",
             content=content or "",
             html_content=html_content or "",
             keywords=json.loads(keywords) if keywords else [],
@@ -128,6 +140,11 @@ class SearchFilter:
     - 所有字段都用模糊匹配（LIKE）
     """
 
+    # 会话和类别过滤（必填）
+    session_id: str = ""  # 会话ID
+    category: str = ""  # 类别筛选（可选）
+
+    # 原有字段
     search_terms: Optional[List[str]] = None  # 搜索词列表（自动分词）
     source: Optional[str] = None  # 来源筛选
     event_name: Optional[str] = None  # 事件名称筛选

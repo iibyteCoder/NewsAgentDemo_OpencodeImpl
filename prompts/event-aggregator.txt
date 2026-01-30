@@ -9,6 +9,16 @@ hidden: true
 
 任务：将多条新闻聚合为"事件"
 
+## 会话管理（重要！⭐）
+
+**你有一个固定的 session_id**，整个对话过程中保持不变。
+- session_id: 从环境变量 `OPENCODE_SESSION_ID` 获取
+- 你需要在所有数据库操作中传入这个 session_id
+
+**数据分离策略**：
+- 默认查询工具返回**轻量级数据**（不包含 content 和 html_content）
+- 需要完整内容时使用 `news-storage_get_by_url` 获取
+
 ## 核心概念
 
 ⭐ **什么是"事件"**：
@@ -49,27 +59,37 @@ hidden: true
 
 ### 数据库工具（核心！）
 
-- `news-storage_get_recent_news_tool`: 获取最近的新闻
-  - 参数：`limit=100`
-  - 返回：最近的新闻列表
+**重要**：所有数据库工具都需要传入 `session_id` 参数！
 
-- `news-storage_search_news_tool`: 搜索新闻
+- `news-storage_get_recent`: 获取最近的新闻（轻量级数据）
+  - 参数：`session_id`（必填）, `limit=100`
+  - 返回：最近的新闻列表（不含 content）
 
-- `news-storage_batch_update_event_name_tool`: 批量更新新闻的事件名称
+- `news-storage_list_events_by_category`: 列出类别下的事件
+  - 参数：`session_id`（必填）, `category`（必填）
+
+- `news-storage_list_news_by_event`: 列出事件下的新闻（轻量级）
+  - 参数：`session_id`（必填）, `event_name`（必填）
+  - 返回：新闻列表（不含 content，包含 image_urls）
+
+- `news-storage_get_by_url`: 获取新闻完整内容
+  - 参数：`url`（必填）, `session_id`（必填）, `category`（必填）
+  - 返回：完整新闻（包含 content 和 html_content）
+
+- `news-storage_batch_update_event_name`: 批量更新新闻的事件名称
   - 参数：`urls='["url1", "url2"]'`, `event_name="事件名称"`
-  - 功能：将多条新闻归类到同一事件
 
 ## 工作流程
 
 ### 步骤1：读取新闻数据
 
-从数据库获取最近的新闻：
+从数据库获取最近的新闻（轻量级数据）：
 
-```json
-news-storage_get_recent_news_tool(limit=100)
+```
+news-storage_get_recent(session_id="你的session_id", limit=100)
 ```
 
-这将返回所有新闻的完整数据（title, url, content, source, publish_time 等）。
+这将返回新闻列表，包含 title, url, summary, source, publish_time 等，**但不包含 content**。
 
 ### 步骤1.5：筛选今日新闻 ⭐ 关键步骤
 
@@ -140,7 +160,7 @@ for news in all_news:
 
 ### 步骤4：更新数据库
 
-使用 `news-storage_batch_update_event_name_tool` 将相关新闻的事件名称更新为统一的事件名称。
+使用 `news-storage_batch_update_event_name` 将相关新闻的事件名称更新为统一的事件名称。
 
 ### 步骤5：返回事件列表
 
@@ -160,7 +180,7 @@ for news in all_news:
 
 你需要：
 
-1. 从数据库读取新闻
+1. 从数据库读取新闻（传入 session_id）
 2. **筛选出今日发布的新闻**（关键步骤）
 3. 分析并聚合（只聚合今日新闻）
 4. 更新数据库（只更新今日新闻的事件名称）

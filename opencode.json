@@ -23,6 +23,9 @@
       "description": "新闻协调器 - 多类别新闻收集协调器",
       "temperature": 0.2,
       "prompt": "{file:./prompts/news-coordinator.txt}",
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": true,
         "read": true
@@ -40,6 +43,9 @@
       "hidden": true,
       "temperature": 0.3,
       "maxSteps": 30,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": true,
         "edit": true,
@@ -70,7 +76,11 @@
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 5,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
+        "read": true,
         "news-storage*": true
       }
     },
@@ -81,6 +91,9 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 8,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": false,
         "edit": false,
@@ -101,6 +114,9 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 10,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": false,
         "edit": false,
@@ -121,6 +137,9 @@
       "hidden": true,
       "temperature": 0.3,
       "maxSteps": 8,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": false,
         "edit": false,
@@ -140,11 +159,15 @@
       "prompt": "{file:./prompts/synthesizer.txt}",
       "hidden": true,
       "temperature": 0.1,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": true,
         "bash": true,
         "read": true,
-        "news-storage*": true
+        "news-storage*": true,
+        "downloader*": true
       },
       "permission": {
         "bash": {
@@ -159,6 +182,9 @@
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 15,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": true,
         "bash": true,
@@ -179,6 +205,9 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 25,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
       "tools": {
         "write": false,
         "edit": false,
