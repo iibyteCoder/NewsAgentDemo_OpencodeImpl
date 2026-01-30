@@ -236,10 +236,29 @@ async def get_news_by_url_tool(
         news = await db.get_news_by_url(url, session_id=session_id, category=category)
 
         if news:
+            # 返回用户友好的格式（列表字段保持为列表，不是JSON字符串）
             result = {
                 "success": True,
                 "found": True,
-                "data": news.to_dict(),
+                "data": {
+                    "title": news.title,
+                    "url": news.url,
+                    "summary": news.summary,
+                    "source": news.source,
+                    "publish_time": news.publish_time,
+                    "author": news.author,
+                    "event_name": news.event_name,
+                    "session_id": news.session_id,
+                    "category": news.category,
+                    "content": news.content,
+                    "html_content": news.html_content,
+                    "keywords": news.keywords,
+                    "image_urls": news.image_urls,
+                    "local_image_paths": news.local_image_paths,
+                    "tags": news.tags,
+                    "created_at": news.created_at,
+                    "updated_at": news.updated_at,
+                },
             }
             logger.info(f"✅ 找到新闻: {news.title[:50]}")
         else:

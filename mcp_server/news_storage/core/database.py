@@ -52,7 +52,7 @@ class NewsDatabase:
             CREATE TABLE IF NOT EXISTS news (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
-                url TEXT UNIQUE NOT NULL,
+                url TEXT NOT NULL,
                 summary TEXT,
                 source TEXT,
                 publish_time TEXT,
@@ -101,7 +101,7 @@ class NewsDatabase:
         logger.debug("📊 数据表创建完成")
 
     async def save_news(self, news: NewsItem, session_id: str = "", category: str = "") -> bool:
-        """保存单条新闻（自动去重）
+        """保存单条新闻（允许重复）
 
         Args:
             news: 新闻对象
@@ -109,91 +109,49 @@ class NewsDatabase:
             category: 类别
 
         Returns:
-            是否插入新记录（False表示更新已存在记录）
+            是否插入新记录
         """
         conn = await self._ensure_connection()
         cursor = await conn.cursor()
 
         try:
-            # 检查是否已存在（在同一会话和类别下）
-            await cursor.execute(
-                "SELECT id FROM news WHERE url = ? AND session_id = ? AND category = ?",
-                (news.url, session_id, category),
-            )
-            existing = await cursor.fetchone()
-
             news_dict = news.to_dict()
             # 覆盖 session_id 和 category
             news_dict["session_id"] = session_id
             news_dict["category"] = category
 
-            if existing:
-                # 更新
-                await cursor.execute(
-                    """
-                    UPDATE news
-                    SET title = ?, summary = ?, source = ?, publish_time = ?,
-                        author = ?, event_name = ?, content = ?, html_content = ?,
-                        keywords = ?, image_urls = ?, local_image_paths = ?, tags = ?,
-                        session_id = ?, category = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE url = ? AND session_id = ? AND category = ?
-                    """,
-                    (
-                        news_dict["title"],
-                        news_dict["summary"],
-                        news_dict["source"],
-                        news_dict["publish_time"],
-                        news_dict["author"],
-                        news_dict["event_name"],
-                        news_dict["content"],
-                        news_dict["html_content"],
-                        news_dict["keywords"],
-                        news_dict["image_urls"],
-                        news_dict["local_image_paths"],
-                        news_dict["tags"],
-                        session_id,
-                        category,
-                        news.url,
-                        session_id,
-                        category,
-                    ),
-                )
-                logger.debug(f"📝 更新新闻: {news.title[:50]}")
-                await conn.commit()
-                return False
-            else:
-                # 插入
-                await cursor.execute(
-                    """
-                    INSERT INTO news (
-                        title, url, summary, source, publish_time, author, event_name,
-                        content, html_content, keywords, image_urls, local_image_paths, tags,
-                        session_id, category, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        news_dict["title"],
-                        news_dict["url"],
-                        news_dict["summary"],
-                        news_dict["source"],
-                        news_dict["publish_time"],
-                        news_dict["author"],
-                        news_dict["event_name"],
-                        news_dict["content"],
-                        news_dict["html_content"],
-                        news_dict["keywords"],
-                        news_dict["image_urls"],
-                        news_dict["local_image_paths"],
-                        news_dict["tags"],
-                        session_id,
-                        category,
-                        news_dict["created_at"],
-                        news_dict["updated_at"],
-                    ),
-                )
-                logger.debug(f"✅ 新增新闻: {news.title[:50]}")
-                await conn.commit()
-                return True
+            # 直接插入（允许重复URL）
+            await cursor.execute(
+                """
+                INSERT INTO news (
+                    title, url, summary, source, publish_time, author, event_name,
+                    content, html_content, keywords, image_urls, local_image_paths, tags,
+                    session_id, category, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    news_dict["title"],
+                    news_dict["url"],
+                    news_dict["summary"],
+                    news_dict["source"],
+                    news_dict["publish_time"],
+                    news_dict["author"],
+                    news_dict["event_name"],
+                    news_dict["content"],
+                    news_dict["html_content"],
+                    news_dict["keywords"],
+                    news_dict["image_urls"],
+                    news_dict["local_image_paths"],
+                    news_dict["tags"],
+                    session_id,
+                    category,
+                    news_dict["created_at"],
+                    news_dict["updated_at"],
+                ),
+            )
+            logger.debug(f"✅ 新增新闻: {news.title[:50]}")
+            await conn.commit()
+            return True
 
         except aiosqlite.Error as e:
             logger.error(f"❌ 保存新闻失败: {e}")

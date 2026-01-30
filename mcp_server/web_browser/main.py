@@ -1,7 +1,10 @@
 """
 Web Browser MCP Server - 智能浏览器与搜索工具
 
-提供智能多引擎搜索功能，支持10个搜索引擎（百度、必应、搜狗、谷歌、360、今日头条、腾讯、网易、新浪、搜狐）
+提供智能多引擎搜索功能，支持10个浏览器搜索引擎 + 1个API搜索引擎（Serper）
+浏览器引擎：百度、必应、搜狗、谷歌、360、今日头条、腾讯、网易、新浪、搜狐
+API引擎：Serper.dev（Google Search API，无需浏览器）
+
 支持网页内容获取、文章解析、热点追踪等功能
 使用 Playwright 浏览器自动化，智能检测并自动禁用被拦截的引擎
 
@@ -23,7 +26,11 @@ from mcp.server.fastmcp import FastMCP
 from loguru import logger
 
 from .config.settings import get_settings
-from .tools import multi_search, fetch_article_content, baidu_hot_search
+from .tools import (
+    multi_search,
+    fetch_article_content,
+    baidu_hot_search,
+)
 
 # 初始化配置
 settings = get_settings()
@@ -46,11 +53,11 @@ async def multi_search_tool(
     num_results: int = 30,
     search_type: str = "web",
 ) -> str:
-    """智能多引擎搜索（支持10个搜索引擎，自动切换）
+    """智能多引擎搜索（支持11个搜索引擎，自动切换）
 
     Args:
         query: 搜索关键词
-        engine: 搜索引擎 (auto|baidu|bing|sogou|google|360|toutiao|tencent|wangyi|sina|sohu)
+        engine: 搜索引擎 (auto|baidu|bing|sogou|google|360|toutiao|tencent|wangyi|sina|sohu|serper)
         num_results: 返回数量（默认30）
         search_type: 搜索类型 (web|news)
 
@@ -58,6 +65,7 @@ async def multi_search_tool(
         JSON格式，包含：engine, engine_name, total, results[{title, url, snippet, source}]
 
     推荐使用 auto 模式自动选择可用引擎。
+    serper 为 API 引擎（无需浏览器），需要配置 SERPER_API_KEY 环境变量。
     返回结构详见: docs/MCP工具使用说明.md
     """
     result = await multi_search(query, engine, num_results, search_type)

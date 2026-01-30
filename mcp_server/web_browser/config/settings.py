@@ -19,19 +19,19 @@ class Settings(BaseSettings):
 
     # ========== 浏览器配置 ==========
     max_concurrent_browsers: int = Field(
-        default=2,
+        default=20,
         description="最大并发浏览器数量",
         ge=1,
-        le=10,
+        le=50,
     )
     max_contexts_per_browser: int = Field(
-        default=5,
+        default=15,
         description="每个浏览器最大上下文数",
         ge=1,
         le=20,
     )
     max_context_pool_size: int = Field(
-        default=10,
+        default=20,
         description="最大上下文池大小",
         ge=1,
         le=50,
@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     # ========== 搜索引擎配置 ==========
     enabled_engines: List[str] = Field(
         default=[
+            "serper",  # API 引擎优先
             "baidu",
             "bing",
             "sogou",
@@ -113,8 +114,13 @@ class Settings(BaseSettings):
         description="启用的搜索引擎列表",
     )
 
+    serper_api_key: Optional[str] = Field(
+        default=None,
+        description="Serper.dev API Key（用于 Google 搜索 API）",
+    )
+
     default_num_results: int = Field(
-        default=30,
+        default=10,
         description="默认返回结果数量",
         ge=1,
         le=100,

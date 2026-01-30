@@ -3,17 +3,29 @@
   "mcp": {
     "web_browser": {
       "type": "local",
-      "command": [".venv/Scripts/python.exe", "-m", "mcp_server.web_browser.main"],
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "mcp_server.web_browser.main"
+      ],
       "enabled": true
     },
     "downloader": {
       "type": "local",
-      "command": [".venv/Scripts/python.exe", "-m", "mcp_server.downloader.main"],
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "mcp_server.downloader.main"
+      ],
       "enabled": true
     },
     "news_storage": {
       "type": "local",
-      "command": [".venv/Scripts/python.exe", "-m", "mcp_server.news_storage.main"],
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "mcp_server.news_storage.main"
+      ],
       "enabled": true
     }
   },
@@ -22,9 +34,10 @@
       "mode": "primary",
       "description": "新闻协调器 - 多类别新闻收集协调器",
       "temperature": 0.2,
-      "prompt": "{file:./prompts/news-coordinator.txt}",
+      "prompt": "{file:./prompts/coordinator.md}",
       "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
       },
       "tools": {
         "write": true,
@@ -38,13 +51,14 @@
     },
     "category-processor": {
       "mode": "subagent",
-      "description": "类别处理器 - 单类别新闻收集处理器",
-      "prompt": "{file:./prompts/category-processor.txt}",
+      "description": "新闻资讯收集智能体 - 单类别处理器",
+      "prompt": "{file:./prompts/category-handler.md}",
       "hidden": true,
-      "temperature": 0.3,
+      "temperature": 0.2,
       "maxSteps": 30,
       "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
       },
       "tools": {
         "write": true,
@@ -55,13 +69,11 @@
         "grep": true,
         "web-browser*": true,
         "downloader*": true,
-        "news-storage*": true
+        "news-storage*": true,
+        "web-browser_fetch_article_content": false
       },
       "permission": {
         "bash": {
-          "python *": "allow",
-          "cd *": "allow",
-          "ls": "allow",
           "mkdir *": "allow"
         },
         "task": {
@@ -69,13 +81,30 @@
         }
       }
     },
+    "news-processor": {
+      "mode": "subagent",
+      "description": "新闻数据预处理专家 - 处理和标准化单条新闻数据",
+      "prompt": "{file:./prompts/news-processor.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 8,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+      },
+      "tools": {
+        "read": true,
+        "web-browser*": true,
+        "news-storage*": true,
+        "downloader*": true
+      }
+    },
     "event-aggregator": {
       "mode": "subagent",
       "description": "事件聚合器 - 将多条新闻聚合为事件",
-      "prompt": "{file:./prompts/event-aggregator.txt}",
+      "prompt": "{file:./prompts/news-aggregator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 5,
+      "maxSteps": 10,
       "env": {
         "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
       },
@@ -87,10 +116,10 @@
     "validator": {
       "mode": "subagent",
       "description": "事件验证器 - 验证事件真实性（主动探索型）",
-      "prompt": "{file:./prompts/validator.txt}",
+      "prompt": "{file:./prompts/event-validator.md}",
       "hidden": true,
       "temperature": 0.2,
-      "maxSteps": 8,
+      "maxSteps": 15,
       "env": {
         "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
       },
@@ -99,7 +128,8 @@
         "edit": false,
         "bash": false,
         "web-browser_*": true,
-        "news-storage*": true
+        "news-storage*": true,
+        "web-browser_fetch_article_content": false
       },
       "permission": {
         "bash": {
@@ -110,10 +140,10 @@
     "timeline-builder": {
       "mode": "subagent",
       "description": "时间轴构建器 - 构建事件发展脉络（主动探索型）",
-      "prompt": "{file:./prompts/timeline-builder.txt}",
+      "prompt": "{file:./prompts/event-timeline.md}",
       "hidden": true,
       "temperature": 0.2,
-      "maxSteps": 10,
+      "maxSteps": 20,
       "env": {
         "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
       },
@@ -122,7 +152,8 @@
         "edit": false,
         "bash": false,
         "web-browser_*": true,
-        "news-storage*": true
+        "news-storage*": true,
+        "web-browser_fetch_article_content": false
       },
       "permission": {
         "bash": {
@@ -133,10 +164,10 @@
     "predictor": {
       "mode": "subagent",
       "description": "趋势预测器 - 预测事件未来发展（主动探索型）",
-      "prompt": "{file:./prompts/predictor.txt}",
+      "prompt": "{file:./prompts/event-predictor.md}",
       "hidden": true,
       "temperature": 0.3,
-      "maxSteps": 8,
+      "maxSteps": 15,
       "env": {
         "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
       },
@@ -145,7 +176,8 @@
         "edit": false,
         "bash": false,
         "web-browser_*": true,
-        "news-storage*": true
+        "news-storage*": true,
+        "web-browser_fetch_article_content": false
       },
       "permission": {
         "bash": {
@@ -153,71 +185,127 @@
         }
       }
     },
-    "synthesizer": {
-      "mode": "subagent",
-      "description": "报告索引生成器 - 生成分类级和总索引文件",
-      "prompt": "{file:./prompts/synthesizer.txt}",
-      "hidden": true,
-      "temperature": 0.1,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
-      "tools": {
-        "write": true,
-        "bash": true,
-        "read": true,
-        "news-storage*": true,
-        "downloader*": true
-      },
-      "permission": {
-        "bash": {
-          "mkdir *": "allow"
-        }
-      }
-    },
-    "event-report-generator": {
-      "mode": "subagent",
-      "description": "事件报告生成器 - 为单个事件生成完整的Markdown报告文件",
-      "prompt": "{file:./prompts/event-report-generator.txt}",
-      "hidden": true,
-      "temperature": 0.1,
-      "maxSteps": 15,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
-      "tools": {
-        "write": true,
-        "bash": true,
-        "read": true,
-        "news-storage*": true,
-        "downloader*": true
-      },
-      "permission": {
-        "bash": {
-          "mkdir *": "allow"
-        }
-      }
-    },
     "event-processor": {
       "mode": "subagent",
       "description": "事件处理器 - 并发处理单个事件的验证、时间轴、预测",
-      "prompt": "{file:./prompts/event-processor.txt}",
+      "prompt": "{file:./prompts/event-analyzer.md}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 25,
       "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
       },
       "tools": {
         "write": false,
         "edit": false,
         "bash": false,
         "read": true,
-        "news-storage*": true
+        "news-storage*": true,
+        "web-browser_fetch_article_content": false
       },
       "permission": {
         "task": {
           "*": "allow"
+        }
+      }
+    },
+    "event-report-generator": {
+      "mode": "subagent",
+      "description": "事件报告生成器（新版）- 生成单个事件的 Markdown 报告文件",
+      "prompt": "{file:./prompts/report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 20,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
+      },
+      "tools": {
+        "write": true,
+        "bash": false,
+        "read": true
+      },
+      "permission": {
+        "task": {
+          "report-assembler": "allow"
+        }
+      }
+    },
+    "report-assembler": {
+      "mode": "subagent",
+      "description": "报告组装器 - 分步生成并组装完整报告（纯文件操作）",
+      "prompt": "{file:./prompts/report-assembler.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 30,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
+      },
+      "tools": {
+        "write": true,
+        "bash": true,
+        "read": true,
+        "news-storage*": true,
+        "downloader*": true
+      },
+      "permission": {
+        "bash": {
+          "mkdir *": "allow",
+          "python *": "allow",
+          "cat *": "allow",
+          "echo *": "allow"
+        },
+        "task": {
+          "report-section-generator": "allow"
+        }
+      }
+    },
+    "report-section-generator": {
+      "mode": "subagent",
+      "description": "报告部分生成器 - 独立生成报告的某个部分",
+      "prompt": "{file:./prompts/report-section-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 10,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
+      },
+      "tools": {
+        "write": true,
+        "bash": true,
+        "read": true
+      },
+      "permission": {
+        "bash": {
+          "mkdir *": "allow",
+          "python *": "allow"
+        }
+      }
+    },
+    "synthesizer": {
+      "mode": "subagent",
+      "description": "类别索引生成器 - 生成类别级的index.md索引文件",
+      "prompt": "{file:./prompts/category-indexer.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 15,
+      "env": {
+        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
+        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
+      },
+      "tools": {
+        "write": true,
+        "bash": true,
+        "read": true,
+        "news-storage*": true
+      },
+      "permission": {
+        "bash": {
+          "ls": "allow",
+          "mkdir *": "allow"
         }
       }
     }

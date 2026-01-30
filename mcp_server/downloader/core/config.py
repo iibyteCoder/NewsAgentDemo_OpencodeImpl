@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     default_download_dir: Path = Path("./downloads")
 
     # 并发下载数量
-    max_concurrent_downloads: int = 5
+    max_concurrent_downloads: int = 15
 
     # 请求超时时间（秒）
     request_timeout: int = 30

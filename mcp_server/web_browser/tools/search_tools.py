@@ -12,6 +12,7 @@ from ..core.browser_pool import get_browser_pool
 from ..core.rate_limiter import RateLimiter
 from ..engines.base import SearchResult
 from ..engines.factory import EngineFactory
+from ..engines.serper import SerperEngine
 from ..utils.helpers import get_random_user_agent, search_result_to_dict
 
 
@@ -91,6 +92,11 @@ async def _check_anti_bot(page: Page, url: str) -> tuple[bool, str]:
         return False, ""
 
 
+def _is_api_engine(engine) -> bool:
+    """检查是否为 API 引擎"""
+    return isinstance(engine, SerperEngine)
+
+
 async def _execute_search(
     engine_id: str,
     query: str,
@@ -112,9 +118,40 @@ async def _execute_search(
             ensure_ascii=False,
         )
 
-    logger.info(f"🔍 [{engine.config.name}] {query} ({search_type})")
+    logger.info(f"🔍 [{engine.name}] {query} ({search_type})")
 
-    # 应用速率限制
+    # API 引擎直接调用（不需要浏览器，不受速率限制）
+    if _is_api_engine(engine):
+        try:
+            results = await engine.search(query, num_results, search_type)
+            results_dict = [search_result_to_dict(r) for r in results]
+
+            return json.dumps(
+                {
+                    "engine": engine_id,
+                    "engine_name": engine.name,
+                    "query": query,
+                    "total": len(results_dict),
+                    "results": results_dict,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        except Exception as e:
+            logger.error(f"❌ {engine.name} 搜索失败: {e}")
+            return json.dumps(
+                {
+                    "engine": engine_id,
+                    "engine_name": engine.name,
+                    "query": query,
+                    "total": 0,
+                    "results": [],
+                    "error": str(e),
+                },
+                ensure_ascii=False,
+            )
+
+    # 浏览器引擎：应用速率限制
     search_url = engine.get_search_url(query, num_results, search_type)
     domain = engine.extract_domain(search_url)
     await _rate_limiter.acquire(domain=domain, engine=engine_id)
@@ -1378,3 +1415,34 @@ async def baidu_hot_search() -> str:
             {"total": 0, "hot_items": [], "error": str(e)},
             ensure_ascii=False,
         )
+
+
+# ========== Serper 搜索函数 ==========
+
+
+async def serper_search(query: str, num_results: int = 30) -> str:
+    """Serper 搜索（使用 Google Search API）
+
+    Args:
+        query: 搜索关键词
+        num_results: 返回结果数量（最大100）
+
+    Note:
+        Serper.dev 使用 API 调用，不需要浏览器
+        速度快，稳定性高，但需要 API Key
+    """
+    return await _execute_search("serper", query, num_results, "web")
+
+
+async def serper_news_search(query: str, num_results: int = 30) -> str:
+    """Serper 新闻搜索（使用 Google Search API）
+
+    Args:
+        query: 搜索关键词
+        num_results: 返回结果数量（最大100）
+
+    Note:
+        Serper.dev 使用 API 调用，不需要浏览器
+    """
+    return await _execute_search("serper", query, num_results, "news")
+
