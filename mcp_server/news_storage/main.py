@@ -27,6 +27,13 @@ from .tools.navigation_tools import (
     list_news_by_event_tool,
     get_images_by_event_tool,
 )
+from .tools.report_sections_tools import (
+    save_report_section_tool,
+    get_report_section_tool,
+    get_all_report_sections_tool,
+    get_report_sections_summary_tool,
+    mark_section_failed_tool,
+)
 
 # 初始化服务器
 server = FastMCP("news_storage")
@@ -41,7 +48,7 @@ logger.info("   数据库: ./data/news_storage.db")
 # ========== 分层导航工具 ==========
 
 
-@server.tool(name="news_storage_list_categories")
+@server.tool(name="news-storage_list_categories")
 async def list_categories(session_id: str) -> str:
     """列出本次会话中的所有新闻类别 - 第一步：了解数据维度
 
@@ -63,7 +70,7 @@ async def list_categories(session_id: str) -> str:
     return await list_categories_tool(session_id=session_id)
 
 
-@server.tool(name="news_storage_list_events_by_category")
+@server.tool(name="news-storage_list_events_by_category")
 async def list_events_by_category(
     session_id: str, category: str, limit: int = 20
 ) -> str:
@@ -91,7 +98,7 @@ async def list_events_by_category(
     )
 
 
-@server.tool(name="news_storage_list_news_by_event")
+@server.tool(name="news-storage_list_news_by_event")
 async def list_news_by_event(session_id: str, event_name: str, limit: int = 50) -> str:
     """列出某个事件下的新闻（轻量级）- 第三步：查看新闻列表
 
@@ -118,7 +125,7 @@ async def list_news_by_event(session_id: str, event_name: str, limit: int = 50) 
     )
 
 
-@server.tool(name="news_storage_get_images_by_event")
+@server.tool(name="news-storage_get_images_by_event")
 async def get_images_by_event(session_id: str, event_name: str) -> str:
     """获取事件下所有新闻的图片URL - 用于报告生成
 
@@ -156,7 +163,7 @@ async def get_images_by_event(session_id: str, event_name: str) -> str:
 # ========== 原有工具 ==========
 
 
-@server.tool(name="news_storage_save")
+@server.tool(name="news-storage_save")
 async def save_news(
     title: str,
     url: str,
@@ -225,7 +232,7 @@ async def save_news(
     )
 
 
-@server.tool(name="news_storage_save_batch")
+@server.tool(name="news-storage_save_batch")
 async def save_news_batch(news_list: str) -> str:
     """批量保存新闻
 
@@ -238,7 +245,7 @@ async def save_news_batch(news_list: str) -> str:
     return await save_news_batch_tool(news_list=news_list)
 
 
-@server.tool(name="news_storage_get_by_url")
+@server.tool(name="news-storage_get_by_url")
 async def get_news_by_url(
     url: str, session_id: str = "", category: str = ""
 ) -> str:
@@ -257,7 +264,7 @@ async def get_news_by_url(
     )
 
 
-@server.tool(name="news_storage_search")
+@server.tool(name="news-storage_search")
 async def search_news(
     session_id: str,
     search: Optional[str] = None,
@@ -301,7 +308,7 @@ async def search_news(
     )
 
 
-@server.tool(name="news_storage_get_recent")
+@server.tool(name="news-storage_get_recent")
 async def get_recent_news(
     session_id: str, limit: int = 100, offset: int = 0
 ) -> str:
@@ -320,7 +327,7 @@ async def get_recent_news(
     )
 
 
-@server.tool(name="news_storage_update_content")
+@server.tool(name="news-storage_update_content")
 async def update_news_content(url: str, content: str, html_content: str = "") -> str:
     """更新新闻内容
 
@@ -337,7 +344,7 @@ async def update_news_content(url: str, content: str, html_content: str = "") ->
     )
 
 
-@server.tool(name="news_storage_delete")
+@server.tool(name="news-storage_delete")
 async def delete_news(url: str) -> str:
     """删除新闻
 
@@ -350,7 +357,7 @@ async def delete_news(url: str) -> str:
     return await delete_news_tool(url=url)
 
 
-@server.tool(name="news_storage_stats")
+@server.tool(name="news-storage_stats")
 async def get_news_stats(session_id: str) -> str:
     """获取统计信息
 
@@ -363,7 +370,7 @@ async def get_news_stats(session_id: str) -> str:
     return await get_news_stats_tool(session_id=session_id)
 
 
-@server.tool(name="news_storage_update_event_name")
+@server.tool(name="news-storage_update_event_name")
 async def update_event_name(url: str, event_name: str) -> str:
     """更新新闻的事件名称
 
@@ -377,7 +384,7 @@ async def update_event_name(url: str, event_name: str) -> str:
     return await update_event_name_tool(url=url, event_name=event_name)
 
 
-@server.tool(name="news_storage_batch_update_event_name")
+@server.tool(name="news-storage_batch_update_event_name")
 async def batch_update_event_name(urls: str, event_name: str) -> str:
     """批量更新新闻的事件名称
 
@@ -389,6 +396,208 @@ async def batch_update_event_name(urls: str, event_name: str) -> str:
         JSON格式：{success, updated, failed, event_name}
     """
     return await batch_update_event_name_tool(urls=urls, event_name=event_name)
+
+
+# ========== 报告部分工具（新版架构） ==========
+# 注意：这些工具用于新的数据库驱动架构，按需读取数据，避免上下文过长
+
+
+@server.tool(name="news-storage_save_report_section")
+async def save_report_section(
+    section_type: str,
+    session_id: str,
+    event_name: str,
+    category: str,
+    content_data: str,
+) -> str:
+    """保存报告部分 - 💾 存储分析结果到数据库
+
+    【核心功能】
+    - 保存报告部分的完整数据到数据库
+    - 支持：验证结果、时间轴、预测、摘要、新闻列表、图片
+    - 避免上下文过长，数据存储在数据库中
+    - 返回 section_id 供后续使用
+
+    【使用场景】
+    - validator 完成验证后保存结果
+    - timeline-builder 完成时间轴后保存结果
+    - predictor 完成预测后保存结果
+
+    Args:
+        section_type: 部分类型
+            - "validation": 真实性验证结果
+            - "timeline": 事件时间轴
+            - "prediction": 趋势预测
+            - "summary": 事件摘要
+            - "news": 新闻列表
+            - "images": 图片列表
+        session_id: 会话ID
+        event_name: 事件名称
+        category: 类别
+        content_data: 内容数据（JSON字符串）
+
+    Returns:
+        JSON格式：{success, section_id, message, section_type}
+
+    Examples:
+        >>> # 保存验证结果
+        >>> save_report_section(
+        ...     section_type="validation",
+        ...     session_id="20260130-abc123",
+        ...     event_name="美国大选",
+        ...     category="政治",
+        ...     content_data='{"credibility_score": 85, "evidence_chain": [...]}'
+        ... )
+    """
+    return await save_report_section_tool(
+        section_type=section_type,
+        session_id=session_id,
+        event_name=event_name,
+        category=category,
+        content_data=content_data,
+    )
+
+
+@server.tool(name="news-storage_get_report_section")
+async def get_report_section(
+    session_id: str, event_name: str, section_type: str
+) -> str:
+    """获取报告部分 - 🔍 读取分析结果
+
+    【核心功能】
+    - 从数据库读取单个报告部分的完整数据
+    - 用于报告生成时按需读取
+    - 避免上下文传递大量数据
+
+    【使用场景】
+    - report-assembler 读取 validation 数据
+    - report-assembler 读取 timeline 数据
+    - report-assembler 读取 prediction 数据
+
+    Args:
+        session_id: 会话ID
+        event_name: 事件名称
+        section_type: 部分类型
+
+    Returns:
+        JSON格式：{success, found, section, content}
+
+    Examples:
+        >>> # 获取验证结果
+        >>> get_report_section(
+        ...     session_id="20260130-abc123",
+        ...     event_name="美国大选",
+        ...     section_type="validation"
+        ... )
+    """
+    return await get_report_section_tool(
+        session_id=session_id, event_name=event_name, section_type=section_type
+    )
+
+
+@server.tool(name="news-storage_get_all_report_sections")
+async def get_all_report_sections(session_id: str, event_name: str) -> str:
+    """获取事件的所有报告部分 - 📋 完整概览
+
+    【核心功能】
+    - 获取事件的所有已保存部分
+    - 返回各部分的完整数据
+    - 用于报告组装器
+
+    【使用场景】
+    - report-assembler 获取所有部分数据
+
+    Args:
+        session_id: 会话ID
+        event_name: 事件名称
+
+    Returns:
+        JSON格式：{success, count, sections}
+
+    Examples:
+        >>> # 获取事件的所有部分
+        >>> get_all_report_sections(
+        ...     session_id="20260130-abc123",
+        ...     event_name="美国大选"
+        ... )
+    """
+    return await get_all_report_sections_tool(
+        session_id=session_id, event_name=event_name
+    )
+
+
+@server.tool(name="news-storage_get_report_sections_summary")
+async def get_report_sections_summary(session_id: str, event_name: str) -> str:
+    """获取报告部分摘要 - 📊 状态概览
+
+    【核心功能】
+    - 获取事件各部分的状态摘要
+    - 不包含完整内容，只包含状态信息
+    - 用于检查哪些部分已完成
+
+    【使用场景】
+    - event-analyzer 检查各部分完成状态
+    - report-assembler 确定哪些部分需要生成
+
+    Args:
+        session_id: 会话ID
+        event_name: 事件名称
+
+    Returns:
+        JSON格式：{success, summary, total, completed, failed}
+
+    Examples:
+        >>> # 检查事件各部分状态
+        >>> get_report_sections_summary(
+        ...     session_id="20260130-abc123",
+        ...     event_name="美国大选"
+        ... )
+    """
+    return await get_report_sections_summary_tool(
+        session_id=session_id, event_name=event_name
+    )
+
+
+@server.tool(name="news-storage_mark_section_failed")
+async def mark_section_failed(
+    session_id: str, event_name: str, section_type: str, error_message: str
+) -> str:
+    """标记报告部分失败 - ❌ 记录错误
+
+    【核心功能】
+    - 标记某个部分生成失败
+    - 记录错误信息
+    - 用于后续错误处理
+
+    【使用场景】
+    - validator 验证失败时记录错误
+    - timeline-builder 构建失败时记录错误
+    - predictor 预测失败时记录错误
+
+    Args:
+        session_id: 会话ID
+        event_name: 事件名称
+        section_type: 部分类型
+        error_message: 错误信息
+
+    Returns:
+        JSON格式：{success, message, section_type}
+
+    Examples:
+        >>> # 标记验证失败
+        >>> mark_section_failed(
+        ...     session_id="20260130-abc123",
+        ...     event_name="美国大选",
+        ...     section_type="validation",
+        ...     error_message="无法获取足够的验证信息"
+        ... )
+    """
+    return await mark_section_failed_tool(
+        session_id=session_id,
+        event_name=event_name,
+        section_type=section_type,
+        error_message=error_message,
+    )
 
 
 if __name__ == "__main__":

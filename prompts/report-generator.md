@@ -22,7 +22,7 @@ hidden: true
 所有数据 → 一次性生成报告 → 上下文过长 → 信息丢失 ❌
 ```
 
-### 新版方案（⭐ 当前使用）
+### 新版方案（当前使用）
 
 ```
 数据 → 各部分独立生成 → 文件合并 → 完整报告 ✓
@@ -36,102 +36,22 @@ hidden: true
 - ⭐ 支持并行生成，提高效率
 - ⭐ 错误隔离，某个部分失败不影响其他部分
 
-## 输入格式
+## 输入
 
-```text
-@event-report-generator 生成事件报告
+从 prompt 中提取以下参数：
 
-事件信息：
-- event_name: {event_name}
-- session_id: {session_id}
-- report_timestamp: {report_timestamp}
-- category: {category}
-- date: {date}
+- event_name: 事件名称
+- session_id: 会话标识符
+- report_timestamp: 报告时间戳
+- category: 类别名称
+- date: 日期
+- validation_result: 验证结果
+- timeline_result: 时间轴结果
+- prediction_result: 预测结果
 
-验证结果: {validation_result}
-时间轴: {timeline_result}
-预测: {prediction_result}
-```
+## 输出
 
-## 工作流程
-
-### 方案：委托给报告组装器（⭐ 推荐）
-
-**新版 `report-generator` 只是一个入口点，实际的分步生成由 `report-assembler` 处理**
-
-```python
-# 直接调用报告组装器
-@report-assembler 生成完整报告
-
-事件信息：
-- event_name: {event_name}
-- session_id: {session_id}
-- report_timestamp: {report_timestamp}
-- category: {category}
-- date: {date}
-
-验证结果: {validation_result}
-时间轴: {timeline_result}
-预测: {prediction_result}
-```
-
-**报告组装器会**：
-
-1. 读取事件的所有新闻数据
-2. 并行调用各个部分生成器（`section-generator`）
-3. 每个部分生成器写入独立文件（`.parts/01-summary.md` 等）
-4. 使用文件合并操作组装最终报告
-5. 返回最终报告路径
-
-### 详细步骤（由 report-assembler 执行）
-
-#### 步骤1：准备数据
-
-```python
-# 读取事件的所有新闻
-news_data = news-storage_search(session_id=session_id, event_name=event_name)
-
-# 创建临时部分文件夹
-parts_dir = f"./output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/.parts"
-```
-
-#### 步骤2：并行生成各部分文件
-
-```python
-# 同时启动所有部分生成任务
-tasks = [
-    Task(prompt="@section-generator ... summary-section ..."),
-    Task(prompt="@section-generator ... news-section ..."),
-    Task(prompt="@section-generator ... validation-section ..."),
-    Task(prompt="@section-generator ... timeline-section ..."),
-    Task(prompt="@section-generator ... prediction-section ..."),
-]
-
-# 每个任务写入独立文件，不返回内容
-# 文件路径：.parts/01-summary.md, .parts/02-news.md, ...
-```
-
-#### 步骤3：文件合并组装
-
-```python
-# 使用文件操作合并（不读取内容到上下文）
-bash(f'cat .parts/*.md > {event_name}.md')
-```
-
-#### 步骤4：清理和返回
-
-```python
-# 可选：删除临时文件夹
-# bash(f'rm -rf .parts')
-
-return {
-    "event_name": event_name,
-    "report_path": "output/.../事件名称.md",
-    "status": "completed"
-}
-```
-
-## 输出格式
+返回包含以下信息的 JSON：
 
 ```json
 {
@@ -144,6 +64,20 @@ return {
   "status": "completed"
 }
 ```
+
+## 工作流程
+
+### 方案：委托给报告组装器
+
+新版 `report-generator` 只是一个入口点，实际的分步生成由 `report-assembler` 处理
+
+**报告组装器会**：
+
+1. 读取事件的所有新闻数据
+2. 并行调用各个部分生成器
+3. 每个部分生成器写入独立文件
+4. 使用文件合并操作组装最终报告
+5. 返回最终报告路径
 
 ## 目录结构
 
@@ -189,7 +123,7 @@ return {
 
 ### 统一时间戳
 
-⭐ **使用传递的 report_timestamp，不要自己生成**
+使用传递的 report_timestamp，不要自己生成
 
 ### 报告内容结构
 
@@ -206,7 +140,7 @@ return {
 ### 新旧版本对比
 
 | 特性 | 旧版本 | 新版本 |
-|------|--------|--------|
+| --- | --- | --- |
 | 生成方式 | 一次性生成 | 分步生成 |
 | 信息丢失 | 容易丢失 | 完整保留 |
 | 上下文占用 | 高 | 低 |
@@ -214,22 +148,11 @@ return {
 | 错误隔离 | 无 | 有 |
 | 实现位置 | report-generator | report-assembler |
 
-## 调试技巧
+### 调试技巧
 
-如果遇到问题，可以查看 `.parts/` 文件夹中的中间文件：
-
-```bash
-# 查看各个部分的生成结果
-ls .parts/
-cat .parts/01-summary.md
-cat .parts/02-news.md
-```
-
-这样可以定位哪个部分生成有问题。
+如果遇到问题，可以查看 `.parts/` 文件夹中的中间文件，定位哪个部分生成有问题
 
 ## 版本历史
 
 - **v2（当前）**：分步生成，委托给 report-assembler
 - **v1（已废弃）**：一次性生成，容易信息丢失
-
-旧版本已备份到 `prompts/backup/report-generator-old.md`
