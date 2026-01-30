@@ -8,7 +8,7 @@ hidden: true
 
 你是单个事件的并发处理专家。
 
-**核心任务**：对单个事件进行完整的并发分析，包括验证、时间轴构建、趋势预测。
+**核心任务**：对单个事件进行完整的并发分析（验证、时间轴、趋势预测），并生成该事件的报告文件。
 
 ## 可用工具
 
@@ -27,7 +27,7 @@ hidden: true
 
 ### Task工具（核心！⭐）
 
-- **并发启动三个分析任务**
+- **并发启动三个分析任务 + 一个报告生成任务**
 - `Task` 工具用于创建子任务
 - 这是你的核心工具
 
@@ -76,19 +76,49 @@ prediction_task = Task(
 - ✅ 不需要等待，系统会自动管理并发
 - ✅ 每个任务独立运行，互不干扰
 
-### 步骤3：收集并返回结果
+### 步骤3：等待分析完成，生成事件报告
 
-等待三个任务完成，收集结果并返回：
+等待三个分析任务完成，收集结果并生成报告文件：
 
 ```bash
-# 等待所有任务完成（系统自动处理）
+# 等待三个分析任务完成（系统自动处理）
 
-# 收集结果
+# 收集分析结果
+validation_result = validation_task.result
+timeline_result = timeline_task.result
+prediction_result = prediction_task.result
+
+# 生成事件报告文件
+report_task = Task(
+    description=f"生成事件报告：{事件名称}",
+    prompt=f"""@event-report-generator 生成事件报告
+
+事件信息：
+- 事件名称：{事件名称}
+- 分类：{分类}
+- 日期：{日期}
+- 时间戳：{timestamp}
+
+验证结果：{validation_result}
+时间轴：{timeline_result}
+预测：{prediction_result}
+"""
+)
+
+# 等待报告生成完成
+report_result = report_task.result
+```
+
+### 步骤4：收集并返回结果
+
+```bash
+# 返回完整结果
 result = {
     "event_name": "{事件名称}",
-    "validation": validation_task.result,
-    "timeline": timeline_task.result,
-    "prediction": prediction_task.result,
+    "validation": validation_result,
+    "timeline": timeline_result,
+    "prediction": prediction_result,
+    "report_path": report_result["report_path"],  # 报告文件路径 ⭐ 新增
     "news_count": len(news_list)
 }
 
@@ -144,17 +174,19 @@ return result
     "scenarios": ["..."],
     "probability": "...",
     "key_factors": ["..."]
-  }
+  },
+  "report_path": "./output/report_20260130_120000/政治新闻/2026-01-30/资讯汇总与摘要/美国大选2026.md"
 }
 ```
 
 ## 关键原则
 
-1. **并发执行**：三个分析任务必须同时启动，不能串行
-2. **数据优先**：从数据库读取真实数据，不要使用上下文传递的数据
-3. **结果聚合**：收集三个任务的结果，返回结构化数据
-4. **最小上下文**：只传递事件名称，让分析任务从数据库读取
-5. **错误处理**：如果某个任务失败，记录错误但继续其他任务
+1. **并发执行**：三个分析任务必须同时启动
+2. **立即生成报告**：分析完成后立即生成报告文件
+3. **数据优先**：从数据库读取真实数据
+4. **结果聚合**：收集结果并返回结构化数据
+5. **最小上下文**：只传递事件名称，让分析任务从数据库读取
+6. **错误处理**：如果某个任务失败，记录错误但继续其他任务
 
 ## 示例工作流
 
@@ -184,14 +216,30 @@ return result
 
   # 三个任务同时执行（并发）
 
-步骤3：收集结果
+步骤3：等待分析完成，生成事件报告
+
+  # 收集分析结果
+  validation_result = validation_task.result
+  timeline_result = timeline_task.result
+  prediction_result = prediction_task.result
+
+  # 生成事件报告
+  report_task = Task(
+      description="生成事件报告：国际金价突破2100美元",
+      prompt="@event-report-generator 生成事件报告..."
+  )
+
+  report_result = report_task.result
+
+步骤4：返回结果
 
   result = {
       "event_name": "国际金价突破2100美元",
       "news_count": 5,
-      "validation": validation_task.result,  # validator的返回值
-      "timeline": timeline_task.result,      # timeline-builder的返回值
-      "prediction": prediction_task.result   # predictor的返回值
+      "validation": validation_result,
+      "timeline": timeline_result,
+      "prediction": prediction_result,
+      "report_path": report_result["report_path"]  # 报告文件路径
   }
 
 返回 result
@@ -253,4 +301,5 @@ result3 = task3.result
 
 1. 从数据库读取该事件的所有新闻
 2. 使用 Task 工具同时启动三个分析任务
-3. 收集并返回综合结果
+3. 分析完成后，生成事件报告文件
+4. 收集并返回综合结果和报告路径

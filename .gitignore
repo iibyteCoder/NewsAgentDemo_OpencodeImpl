@@ -23,3 +23,9 @@ report_*/
 
 # Temporary JSON data files
 *.json
+
+# IDE configuration
+.idea/
+
+# Downloads directory
+downloads/

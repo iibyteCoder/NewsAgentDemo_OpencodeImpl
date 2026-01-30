@@ -177,20 +177,29 @@ all_news = news-storage_search_news_tool(
       "event": "宣布参选",
       "importance": "高",
       "description": "特朗普在社交媒体宣布参加2024年大选",
-      "sources": ["社交媒体", "新闻报道"]
+      "sources": [
+        {"title": "特朗普宣布参选2024年美国总统", "url": "https://...", "source": "社交媒体"}
+      ]
     },
     {
       "date": "2024-01-20",
       "event": "首场辩论",
       "importance": "中",
-      "description": "与竞争对手进行首场辩论"
+      "description": "与竞争对手进行首场辩论",
+      "sources": [
+        {"title": "共和党首场辩论综述", "url": "https://...", "source": "CNN"}
+      ]
     },
     {
       "date": "2024-01-25",
       "event": "赢得艾奥瓦初选",
       "importance": "高",
       "description": "以显著优势获胜",
-      "sources": ["CNN", "Fox", "Reuters"]
+      "sources": [
+        {"title": "特朗普赢得艾奥瓦初选", "url": "https://...", "source": "CNN"},
+        {"title": "艾奥瓦初选结果", "url": "https://...", "source": "Fox News"},
+        {"title": "Iowa Caucus Results", "url": "https://...", "source": "Reuters"}
+      ]
     }
   ],
   "causality": "宣布参选 → 首场辩论 → 赢得艾奥瓦初选",
@@ -207,6 +216,7 @@ all_news = news-storage_search_news_tool(
 3. **多维度探索**：从背景、人物、数据、影响等多个角度搜索
 4. **先收集后分析**：收集足够信息后，从数据库读取并综合分析
 5. **完整脉络**：构建完整的因果链和发展叙述
+6. **来源可追溯**：每个里程碑必须包含具体的新闻标题、URL和媒体名称
 
 ## 示例工作流
 

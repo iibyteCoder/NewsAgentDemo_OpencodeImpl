@@ -18,11 +18,28 @@
     }
   },
   "agent": {
-    "news-collector": {
+    "news-coordinator": {
       "mode": "primary",
-      "description": "新闻资讯收集智能体 - S级（事件驱动架构）",
+      "description": "新闻协调器 - 多类别新闻收集协调器",
+      "temperature": 0.2,
+      "prompt": "{file:./prompts/news-coordinator.txt}",
+      "tools": {
+        "write": true,
+        "read": true
+      },
+      "permission": {
+        "task": {
+          "*": "allow"
+        }
+      }
+    },
+    "category-processor": {
+      "mode": "subagent",
+      "description": "类别处理器 - 单类别新闻收集处理器",
+      "prompt": "{file:./prompts/category-processor.txt}",
+      "hidden": true,
       "temperature": 0.3,
-      "prompt": "{file:./prompts/news-collector.txt}",
+      "maxSteps": 30,
       "tools": {
         "write": true,
         "edit": true,
@@ -49,7 +66,7 @@
     "event-aggregator": {
       "mode": "subagent",
       "description": "事件聚合器 - 将多条新闻聚合为事件",
-      "prompt": "{file:.opencode/agents/event-aggregator.md}",
+      "prompt": "{file:./prompts/event-aggregator.txt}",
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 5,
@@ -60,7 +77,7 @@
     "validator": {
       "mode": "subagent",
       "description": "事件验证器 - 验证事件真实性（主动探索型）",
-      "prompt": "{file:.opencode/agents/validator.md}",
+      "prompt": "{file:./prompts/validator.txt}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 8,
@@ -80,7 +97,7 @@
     "timeline-builder": {
       "mode": "subagent",
       "description": "时间轴构建器 - 构建事件发展脉络（主动探索型）",
-      "prompt": "{file:.opencode/agents/timeline-builder.md}",
+      "prompt": "{file:./prompts/timeline-builder.txt}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 10,
@@ -100,7 +117,7 @@
     "predictor": {
       "mode": "subagent",
       "description": "趋势预测器 - 预测事件未来发展（主动探索型）",
-      "prompt": "{file:.opencode/agents/predictor.md}",
+      "prompt": "{file:./prompts/predictor.txt}",
       "hidden": true,
       "temperature": 0.3,
       "maxSteps": 8,
@@ -119,13 +136,31 @@
     },
     "synthesizer": {
       "mode": "subagent",
-      "description": "报告生成器 - 生成最终结构化报告",
-      "prompt": "{file:.opencode/agents/synthesizer.md}",
+      "description": "报告索引生成器 - 生成分类级和总索引文件",
+      "prompt": "{file:./prompts/synthesizer.txt}",
       "hidden": true,
       "temperature": 0.1,
       "tools": {
         "write": true,
-        "edit": true,
+        "bash": true,
+        "read": true,
+        "news-storage*": true
+      },
+      "permission": {
+        "bash": {
+          "mkdir *": "allow"
+        }
+      }
+    },
+    "event-report-generator": {
+      "mode": "subagent",
+      "description": "事件报告生成器 - 为单个事件生成完整的Markdown报告文件",
+      "prompt": "{file:./prompts/event-report-generator.txt}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 15,
+      "tools": {
+        "write": true,
         "bash": true,
         "read": true,
         "news-storage*": true,
@@ -140,7 +175,7 @@
     "event-processor": {
       "mode": "subagent",
       "description": "事件处理器 - 并发处理单个事件的验证、时间轴、预测",
-      "prompt": "{file:.opencode/agents/event-processor.md}",
+      "prompt": "{file:./prompts/event-processor.txt}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 25,

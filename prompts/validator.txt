@@ -173,11 +173,33 @@ all_news = news-storage_search_news_tool(
   "credibility_score": 85,
   "confidence_level": "高",
   "evidence_chain": [
-    "搜索1（辟谣）：使用 web-browser_multi_search_tool 搜索'特朗普艾奥瓦辟谣'，未发现辟谣信息",
-    "搜索2（其他来源）：使用 web-browser_multi_search_tool 搜索'特朗普艾奥瓦'，发现5个其他类似报道",
-    "搜索3（媒体可信度）：CNN、Fox、Reuters均为权威媒体",
-    "搜索4（数据验证）：艾奥瓦州务卿官网确认结果",
-    "搜索5（专家观点）：政治分析师普遍认可结果"
+    {
+      "step": "搜索1（辟谣验证）",
+      "finding": "未发现辟谣信息",
+      "sources": [
+        {"title": "搜索结果标题", "url": "https://...", "source": "媒体名"}
+      ]
+    },
+    {
+      "step": "搜索2（其他来源）",
+      "finding": "发现5个其他类似报道",
+      "sources": [
+        {"title": "报道标题1", "url": "https://...", "source": "CNN"},
+        {"title": "报道标题2", "url": "https://...", "source": "Fox News"}
+      ]
+    },
+    {
+      "step": "搜索3（媒体可信度）",
+      "finding": "CNN、Fox、Reuters均为权威媒体",
+      "sources": []
+    },
+    {
+      "step": "搜索4（官方数据验证）",
+      "finding": "艾奥瓦州务卿官网确认结果",
+      "sources": [
+        {"title": "艾奥瓦州务卿官网", "url": "https://...", "source": "官方来源"}
+      ]
+    }
   ],
   "validation_rounds": 5,
   "key_findings": [
@@ -192,9 +214,10 @@ all_news = news-storage_search_news_tool(
 
 1. **主动搜索 + 保存**：每轮搜索都要决定新的搜索关键词，并保存结果到数据库
 2. **多源验证**：从多个角度验证（辟谣、其他来源、专家观点等）
-3. **完整证据链**：记录每一步的搜索和发现
+3. **完整证据链**：记录每一步的搜索和发现，**每一步都要包含具体的新闻标题和URL**
 4. **先收集后分析**：收集足够信息后，从数据库读取并综合分析
 5. **收敛条件**：达到可信度或最大轮数时停止
+6. **来源可追溯**：所有证据必须包含具体的新闻标题、URL和媒体名称
 
 ## 示例工作流
 

@@ -182,6 +182,10 @@ all_news = news-storage_search_news_tool(
         "美联储维持当前利率政策",
         "美元指数保持稳定",
         "地缘政治风险可控"
+      ],
+      "sources": [
+        {"title": "美联储会议纪要显示政策倾向", "url": "https://...", "source": "Bloomberg"},
+        {"title": "美元指数技术分析", "url": "https://...", "source": "Reuters"}
       ]
     },
     "optimistic": {
@@ -190,6 +194,9 @@ all_news = news-storage_search_news_tool(
       "assumptions": [
         "美联储降息",
         "地缘政治紧张加剧"
+      ],
+      "sources": [
+        {"title": "专家预测金价可能突破2300", "url": "https://...", "source": "CNBC"}
       ]
     },
     "pessimistic": {
@@ -198,19 +205,22 @@ all_news = news-storage_search_news_tool(
       "assumptions": [
         "美联储加息",
         "美元走强"
+      ],
+      "sources": [
+        {"title": "高盛警告金价下行风险", "url": "https://...", "source": " Goldman Sachs Report"}
       ]
     }
   },
   "key_factors": [
-    "美联储货币政策",
-    "美元指数走势",
-    "地缘政治风险",
-    "通胀预期"
+    {"factor": "美联储货币政策", "sources": [{"title": "...", "url": "...", "source": "..."}]},
+    {"factor": "美元指数走势", "sources": [{"title": "...", "url": "...", "source": "..."}]},
+    {"factor": "地缘政治风险", "sources": [{"title": "...", "url": "...", "source": "..."}]},
+    {"factor": "通胀预期", "sources": [{"title": "...", "url": "...", "source": "..."}]}
   ],
   "risks": [
-    "政策突变风险",
-    "黑天鹅事件",
-    "市场情绪突变"
+    {"risk": "政策突变风险", "sources": []},
+    {"risk": "黑天鹅事件", "sources": []},
+    {"risk": "市场情绪突变", "sources": []}
   ],
   "research_rounds": 7,
   "prediction_horizon": "未来3个月",
@@ -225,6 +235,7 @@ all_news = news-storage_search_news_tool(
 3. **先收集后分析**：收集足够信息后，从数据库读取并综合分析
 4. **情景分析**：提供多种情景和概率，而非单一预测
 5. **充分依据**：每个预测都要有数据库中的搜索结果作为支撑
+6. **来源可追溯**：每个情景、每个关键因素都必须包含具体的新闻标题、URL和媒体名称
 
 ## 示例工作流
 
