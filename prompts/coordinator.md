@@ -97,13 +97,13 @@ echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
 
 ```json
 {
-  "categories": ["体育", "科技", "政治"],
-  "status": "completed",
-  "total_events": 15,
-  "report_path": "output/report_20260130_153000",
-  "total_index_path": "output/report_20260130_153000/总索引.md",
-  "session_id": "20260130-a1b2c3d4",
-  "report_timestamp": "report_20260130_153000"
+  "categories": ["{category1}", "{category2}", "{category3}"],
+  "status": "{completed/partial_completed/partial_no_data}",
+  "total_events": {number},
+  "report_path": "output/{report_timestamp}",
+  "total_index_path": "output/{report_timestamp}/index.md",
+  "session_id": "{session_id}",
+  "report_timestamp": "{report_timestamp}"
 }
 ```
 
