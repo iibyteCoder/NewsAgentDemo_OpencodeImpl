@@ -26,7 +26,8 @@
       "Bash(Select-Object:*)",
       "Bash(sqlite3:*)",
       "Bash(py:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(wc:*)"
     ]
   }
 }

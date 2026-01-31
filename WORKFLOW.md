@@ -196,7 +196,7 @@
     ↓
 【第二层：内容层】（混合执行）
     步骤1（串行）:
-    └── @news-collector → @news-report-generator → 02-news.md
+    └── @news-builder → @news-report-generator → 02-news.md
         ↓
     【等待步骤1完成】
         ↓

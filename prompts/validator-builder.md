@@ -36,6 +36,7 @@ hidden: true
 - event_name: 事件名称
 - session_id: 会话标识符
 - category: 类别名称
+- report_timestamp: 报告时间戳（传递给 Generator）
 
 ## 输出
 
@@ -45,7 +46,7 @@ hidden: true
 {
   "status": "completed",
   "event_name": "事件名称",
-  "section_id": "session_id_事件名称_validation",
+  "section_id": "session_id",
   "message": "验证结果已保存到数据库"
 }
 ```
@@ -110,6 +111,19 @@ hidden: true
 4. **并行保存搜索结果** - 并行使用 `@news-processor` 处理所有搜索结果并保存到数据库
 5. 综合判断 - 基于所有信息给出可信度评分
 6. **保存验证结果** - 使用 `news-storage_save_report_section` 保存到数据库
+   - **section_type**: "validation"（⚠️ 必须使用此值，保存和获取时必须保持一致）
+   - **content_data**: JSON格式的验证结果
+7. **⭐ 调用 Generator** - 使用 `Task` 工具调用 `@validation-report-generator` 生成报告部分
+
+```python
+Task("@validation-report-generator", prompt=f"""
+生成验证报告：
+- event_name: {event_name}
+- session_id: {session_id}
+- category: {category}
+- report_timestamp: {report_timestamp}
+""")
+```
 
 ## 可用工具
 

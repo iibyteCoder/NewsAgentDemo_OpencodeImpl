@@ -36,6 +36,7 @@ hidden: true
 - event_name: 事件名称
 - session_id: 会话标识符
 - category: 类别名称
+- report_timestamp: 报告时间戳（传递给 Generator）
 
 ## 输出
 
@@ -45,7 +46,7 @@ hidden: true
 {
   "status": "completed",
   "event_name": "事件名称",
-  "section_id": "session_id_事件名称_prediction",
+  "section_id": "session_id",
   "message": "预测结果已保存到数据库"
 }
 ```
@@ -124,6 +125,19 @@ hidden: true
 4. **并行保存搜索结果** - 并行使用 `@news-processor` 处理所有搜索结果并保存到数据库
 5. 构建多情景预测 - 基于所有信息构建乐观/基准/悲观情景
 6. **保存预测结果** - 使用 `news-storage_save_report_section` 保存到数据库
+   - **section_type**: "prediction"（⚠️ 必须使用此值，保存和获取时必须保持一致）
+   - **content_data**: JSON格式的预测结果
+7. **⭐ 调用 Generator** - 使用 `Task` 工具调用 `@prediction-report-generator` 生成报告部分
+
+```python
+Task("@prediction-report-generator", prompt=f"""
+生成预测报告：
+- event_name: {event_name}
+- session_id: {session_id}
+- category: {category}
+- report_timestamp: {report_timestamp}
+""")
+```
 
 ## 可用工具
 

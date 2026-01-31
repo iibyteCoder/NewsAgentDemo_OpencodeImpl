@@ -1,5 +1,5 @@
 ---
-description: 新闻来源报告生成器 - 专门生成新闻来源部分
+description: 新闻来源报告生成器 - 从数据库读取新闻数据并生成报告部分
 mode: subagent
 temperature: 0.1
 maxSteps: 8
@@ -10,40 +10,63 @@ hidden: true
 
 ## 核心职责
 
-从数据库读取新闻数据，按照模板生成报告。
+1. 从数据库读取新闻数据（section_type="news"）
+2. 按模板格式生成 Markdown 内容
+3. 使用 `write` 工具写入 `.parts/02-news.md` 文件
+4. 返回 JSON 格式的操作状态
 
-## 输入
+## 输入参数
+
+从 prompt 中提取：
 
 - `event_name`: 事件名称
-- `session_id`: 会话标识符（从参数获取，禁止自己生成）
+- `session_id`: 会话标识符
 - `category`: 类别名称
-- `date`: 日期（用于区分今日新闻）
-- `output_mode`: 输出模式（`return_content` 或 `write_to_file`）
-- `output_file`: 输出文件路径（write_to_file 模式需要）
+- `report_timestamp`: 报告时间戳（如 `report_20260131_194757`）
+- `date`: 日期（如 `2026-01-31`）
 
 ## 工作流程
 
-1. 从数据库读取新闻数据（`news-storage_get_report_section`，section_type="news"）
-2. 提取 `today_news` 和 `related_news`
-3. 按照 `templates/sections/news-section-template.md` 填充模板
-4. 根据输出模式返回结果或写入文件
+1. **读取数据库**：使用 `news-storage_get_report_section` 读取新闻数据（section_type="news"）
+2. **生成内容**：按照模板格式填充数据，生成 Markdown 内容
+3. **计算路径**：输出文件路径为 `./output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/{event_name}/.parts/02-news.md`
+4. **写入文件**：使用 `write` 工具将内容写入文件
+5. **返回结果**：返回 JSON 格式的操作状态
 
-## 输出格式
+## 输出要求
+
+**最后必须返回以下 JSON 格式**：
 
 ```json
 {
   "section_type": "news",
-  "file_path": "./output/.../事件名称/.parts/02-news.md",
+  "file_path": "./output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/{event_name}/.parts/02-news.md",
   "word_count": 2000,
   "status": "completed"
 }
 ```
 
-## 模板文件
+**路径说明**：使用实际的 `report_timestamp`、`category`、`date`、`event_name` 参数值填充路径。
 
-参考：`templates/sections/news-section-template.md`
+## 报告格式
 
-## 数据来源
+参考模板：`@templates/sections/news-section-template.md`（自动包含）
+
+### 填充规则
+
+**今日新闻**：
+
+- 遍历 `today_news` 数组
+- 每条新闻包含：标题（链接格式）、媒体、发布时间、摘要
+- 标题格式：`[{title}]({url})`
+
+**相关新闻**：
+
+- 遍历 `related_news` 数组
+- 每条新闻包含：标题（链接格式）、媒体、发布时间、摘要
+- 标题格式：`[{title}]({url})`
+
+**数据来源**：
 
 ```json
 {
@@ -62,12 +85,17 @@ hidden: true
 
 ## 可用工具
 
-- `news-storage_get_report_section` - 从数据库读取新闻数据
+- `news-storage_get_report_section` - 读取新闻数据
 - `write` - 写入文件
 
-## 关键要求
+## 关键原则
 
-1. **使用模板文件** - 严格按照 `templates/sections/news-section-template.md` 填充
-2. **使用数据库真实数据** - 直接使用数据中的字段，不要修改
-3. **格式统一** - 标题使用链接格式 `[title](url)`
-4. **完整呈现** - 包含所有新闻，不遗漏
+1. ⭐⭐⭐ **session_id 管理** - 从 prompt 参数获取，禁止自己生成
+2. ⭐⭐⭐ **使用数据库真实数据** - 直接使用数据中的字段，不要修改
+3. ⭐⭐ **格式统一** - 标题使用链接格式 `[{title}]({url})`
+4. ⭐ **完整呈现** - 包含所有新闻，不遗漏
+
+## 错误处理
+
+- 数据为空 → 生成说明"暂无新闻数据"
+- 部分字段缺失 → 使用已有数据生成

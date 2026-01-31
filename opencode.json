@@ -99,10 +99,10 @@
         "news-storage*": true
       }
     },
-    "news-collector": {
+    "news-builder": {
       "mode": "subagent",
-      "description": "新闻收集器 - 收集并分类新闻，保存到数据库",
-      "prompt": "{file:./prompts/news-collector.md}",
+      "description": "新闻数据收集器 - 收集并分类新闻，保存到数据库",
+      "prompt": "{file:./prompts/news-builder.md}",
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 15,
@@ -113,17 +113,18 @@
       },
       "permission": {
         "task": {
-          "news-processor": "allow"
+          "news-processor": "allow",
+          "news-report-generator": "allow"
         }
       }
     },
-    "validator": {
+    "validator-builder": {
       "mode": "subagent",
-      "description": "事件验证器 - 验证事件真实性（主动探索型）",
-      "prompt": "{file:./prompts/event-validator.md}",
+      "description": "验证数据收集器 - 验证事件真实性（主动探索型）",
+      "prompt": "{file:./prompts/validator-builder.md}",
       "hidden": true,
       "temperature": 0.2,
-      "maxSteps": 15,
+      "maxSteps": 25,
       "tools": {
         "write": false,
         "edit": false,
@@ -134,7 +135,8 @@
       },
       "permission": {
         "task": {
-          "news-processor": "allow"
+          "news-processor": "allow",
+          "validation-report-generator": "allow"
         },
         "bash": {
           "python *": "allow"
@@ -143,8 +145,8 @@
     },
     "timeline-builder": {
       "mode": "subagent",
-      "description": "时间轴构建器 - 构建事件发展脉络（主动探索型）",
-      "prompt": "{file:./prompts/event-timeline.md}",
+      "description": "时间轴数据收集器 - 构建事件发展脉络（主动探索型）",
+      "prompt": "{file:./prompts/timeline-builder.md}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 20,
@@ -158,20 +160,21 @@
       },
       "permission": {
         "task": {
-          "news-processor": "allow"
+          "news-processor": "allow",
+          "timeline-report-generator": "allow"
         },
         "bash": {
           "python *": "allow"
         }
       }
     },
-    "predictor": {
+    "predictor-builder": {
       "mode": "subagent",
-      "description": "趋势预测器 - 预测事件未来发展（主动探索型）",
-      "prompt": "{file:./prompts/event-predictor.md}",
+      "description": "预测数据收集器 - 预测事件未来发展（主动探索型）",
+      "prompt": "{file:./prompts/predictor-builder.md}",
       "hidden": true,
       "temperature": 0.3,
-      "maxSteps": 15,
+      "maxSteps": 25,
       "tools": {
         "write": false,
         "edit": false,
@@ -182,7 +185,8 @@
       },
       "permission": {
         "task": {
-          "news-processor": "allow"
+          "news-processor": "allow",
+          "prediction-report-generator": "allow"
         },
         "bash": {
           "python *": "allow"
@@ -199,6 +203,11 @@
       "tools": {
         "read": true,
         "news-storage*": true
+      },
+      "permission": {
+        "task": {
+          "summary-report-generator": "allow"
+        }
       }
     },
     "images-builder": {
@@ -217,6 +226,9 @@
       "permission": {
         "bash": {
           "mkdir *": "allow"
+        },
+        "task": {
+          "images-report-generator": "allow"
         }
       }
     },

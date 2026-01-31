@@ -117,7 +117,7 @@
                          │
                          ↓
 ┌────────────────────────────────────────────────────────────────┐
-│  @news-collector                                               │
+│  @news-builder                                               │
 │  (新闻数据收集器)                                               │
 ├────────────────────────────────────────────────────────────────┤
 │ 1. 从 news 表读取事件新闻                                       │
@@ -244,7 +244,7 @@ Task(@predictor-builder) → @prediction-report-generator
 
 | 阶段  | 任务 | 数据收集层       | 依赖            | 文件生成层                | 输出文件             |
 | ----- | ---- | ---------------- | --------------- | ------------------------- | -------------------- |
-| 步骤1 | 新闻 | @news-collector  | news表          | @news-report-generator    | .parts/02-news.md    |
+| 步骤1 | 新闻 | @news-builder  | news表          | @news-report-generator    | .parts/02-news.md    |
 | 步骤2 | 摘要 | @summary-builder | news表          | @summary-report-generator | .parts/01-summary.md |
 | 步骤2 | 图片 | @images-builder  | 步骤1的news数据 | @images-report-generator  | .parts/06-images.md  |
 
@@ -252,7 +252,7 @@ Task(@predictor-builder) → @prediction-report-generator
 
 ```python
 # 步骤1：新闻流程
-@news-collector → @news-report-generator
+@news-builder → @news-report-generator
 [等待完成]
 ↓
 # 步骤2：摘要 + 图片 并行执行
@@ -285,7 +285,7 @@ Task(@images-builder → @images-report-generator)
 | @validation-report-generator | ✅ 存在  | ✅ 保持不变           |
 | @timeline-report-generator   | ✅ 存在  | ✅ 保持不变           |
 | @prediction-report-generator | ✅ 存在  | ✅ 保持不变           |
-| @news-collector              | ✅ 存在  | ✅ 保持不变           |
+| @news-builder              | ✅ 存在  | ✅ 保持不变           |
 | @news-report-generator       | ✅ 存在  | ✅ 保持不变           |
 | @summary-report-generator    | ✅ 存在  | ✅ 保持不变           |
 | @images-report-generator     | ✅ 存在  | 🔧 修改为从数据库读取 |
@@ -317,7 +317,7 @@ T1-T10: 【第一层：分析层】并行执行
 T11: 【等待分析层完成】
 
 T12: 【第二层：内容层】步骤1
-    └─ @news-collector → @news-report-generator
+    └─ @news-builder → @news-report-generator
 
 T13: 【等待步骤1完成】
 
@@ -392,7 +392,7 @@ news 表（原始数据）
     ├──────────────────────────────┐
     │                              │
     ↓                              ↓
-@news-collector                 @summary-builder
+@news-builder                 @summary-builder
 (步骤1)                         (步骤2A)
     │                              │
     ↓                              ↓
@@ -434,7 +434,7 @@ generator
 
 ## 需要新增和修改的智能体
 
-### 1. @news-collector（需扩展）⭐
+### 1. @news-builder（需扩展）⭐
 
 **当前状态**：✅ 已存在，需扩展功能
 
@@ -659,7 +659,7 @@ generator
 - 实现三层架构调用
 - 第一层：并行启动分析层（@validator-builder、@timeline-builder、@predictor-builder）
 - 等待分析层完成
-- 第二层-步骤1：启动 @news-collector → @news-report-generator
+- 第二层-步骤1：启动 @news-builder → @news-report-generator
 - 第二层-步骤2：并行启动 @summary-builder + @images-builder
 - 等待内容层完成
 - 第三层：启动 @report-assembler（纯文件组装）
@@ -686,7 +686,7 @@ generator
 
 - 添加 @summary-builder 配置（新增）
 - 添加 @images-builder 配置（新增）
-- 更新 @news-collector 权限（添加搜索和Task工具）
+- 更新 @news-builder 权限（添加搜索和Task工具）
 - 更新 @event-processor 权限（添加调用新智能体的权限）
 - 更新 @images-report-generator 权限（移除下载工具）
 - 更新 @report-assembler 权限（移除数据库和Task工具）

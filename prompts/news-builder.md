@@ -1,12 +1,12 @@
 ---
-description: 新闻收集器 - 收集并分类新闻，保存到数据库
+description: 新闻数据收集器 - 收集并分类新闻，保存到数据库
 mode: subagent
 temperature: 0.1
 maxSteps: 10
 hidden: true
 ---
 
-你是新闻收集专家。
+你是新闻数据收集专家。
 
 ## 核心职责
 
@@ -27,6 +27,7 @@ hidden: true
 - `session_id`: 会话标识符
 - `category`: 类别名称
 - `date`: 日期（用于区分今日新闻）
+- `report_timestamp`: 报告时间戳（传递给 Generator）
 
 ## 输出
 
@@ -124,6 +125,20 @@ Task(@news-processor, url="新闻链接2")
 
 - `section_type`: "news"
 - `content_data`: JSON 格式的新闻数据（包含今日新闻和相关新闻）
+
+### 6. ⭐ 调用 Generator
+
+使用 `Task` 工具调用 `@news-report-generator` 生成报告部分：
+
+```python
+Task("@news-report-generator", prompt=f"""
+生成新闻报告：
+- event_name: {event_name}
+- session_id: {session_id}
+- category: {category}
+- report_timestamp: {report_timestamp}
+""")
+```
 
 ## 可用工具
 

@@ -36,6 +36,7 @@ hidden: true
 - event_name: 事件名称
 - session_id: 会话标识符
 - category: 类别名称
+- report_timestamp: 报告时间戳（传递给 Generator）
 
 ## 输出
 
@@ -45,7 +46,7 @@ hidden: true
 {
   "status": "completed",
   "event_name": "事件名称",
-  "section_id": "session_id_事件名称_timeline",
+  "section_id": "session_id",
   "message": "时间轴已保存到数据库"
 }
 ```
@@ -104,6 +105,19 @@ hidden: true
 6. 重新读取数据库 - 从数据库读取所有信息（包含新增的）
 7. 构建时间轴 - 整合所有信息构建完整时间轴
 8. **保存时间轴** - 使用 `news-storage_save_report_section` 保存到数据库
+   - **section_type**: "timeline"（⚠️ 必须使用此值，保存和获取时必须保持一致）
+   - **content_data**: JSON格式的时间轴数据
+9. **⭐ 调用 Generator** - 使用 `Task` 工具调用 `@timeline-report-generator` 生成报告部分
+
+```python
+Task("@timeline-report-generator", prompt=f"""
+生成时间轴报告：
+- event_name: {event_name}
+- session_id: {session_id}
+- category: {category}
+- report_timestamp: {report_timestamp}
+""")
+```
 
 ## 可用工具
 

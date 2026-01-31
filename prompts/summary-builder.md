@@ -19,6 +19,7 @@ hidden: true
 - `event_name`: 事件名称
 - `session_id`: 会话标识符
 - `category`: 类别名称
+- `report_timestamp`: 报告时间戳（传递给 Generator）
 
 ## 工作流程
 
@@ -40,6 +41,18 @@ hidden: true
    - 使用 `news-storage_save_report_section`
    - section_type: "summary"
    - 保存摘要数据和关键点
+
+5. **⭐ 调用 Generator** - 使用 `Task` 工具调用 `@summary-report-generator` 生成报告部分
+
+```python
+Task("@summary-report-generator", prompt=f"""
+生成摘要报告：
+- event_name: {event_name}
+- session_id: {session_id}
+- category: {category}
+- report_timestamp: {report_timestamp}
+""")
+```
 
 ## 输出格式
 
