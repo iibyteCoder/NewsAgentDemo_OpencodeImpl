@@ -78,35 +78,107 @@ hidden: true
 **不要继续执行**：
 
 - 不要启动任何分析任务
-- 不要调用 @validator、@timeline-builder、@predictor
+- 不要调用任何 builder 或 generator
 - 不要生成报告
 
-### 阶段2：并发启动四个数据收集任务（核心）
+---
 
-**必须并行调用** - 同时启动四个任务，所有任务并发执行，不要串行：
+### 第一层：分析层（并行执行）
 
-- `@news-collector` - 收集新闻数据，**保存到数据库**
-- `@validator` - 验证事件真实性，**保存到数据库**
-- `@timeline-builder` - 构建事件时间轴，**保存到数据库**
-- `@predictor` - 预测事件发展趋势，**保存到数据库**
+**同时启动三个分析任务**，所有任务并发执行：
+
+1. **验证流程**：
+   - 调用 `@validator`（数据收集） → 保存到数据库（section_type="validation"）
+   - 调用 `@validation-report-generator`（生成文件） → 生成 `.parts/03-validation.md`
+
+2. **时间轴流程**：
+   - 调用 `@timeline-builder`（数据收集） → 保存到数据库（section_type="timeline"）
+   - 调用 `@timeline-report-generator`（生成文件） → 生成 `.parts/04-timeline.md`
+
+3. **预测流程**：
+   - 调用 `@predictor`（数据收集） → 保存到数据库（section_type="prediction"）
+   - 调用 `@prediction-report-generator`（生成文件） → 生成 `.parts/05-prediction.md`
 
 **关键**：
+- ✅ 三个流程必须同时启动（完全并行）
+- ❌ 不要等待一个流程完成后再启动下一个
+- 每个 builder 完成后立即调用对应的 generator
+- 等待所有流程完成后进入第二层
 
-- ✅ 四个任务必须同时启动（并行执行）
-- ❌ 不要等待一个任务完成后再启动下一个
-- 这些任务现在只返回状态，不返回完整数据
+---
 
-### 阶段3：检查完成状态
+### 第二层：内容层（混合执行）
 
-等待所有任务完成，使用 `news-storage_get_report_sections_summary` 检查各部分状态
+#### 步骤1：新闻流程（串行）
 
-某个任务失败时使用默认值继续，但标记报告为部分完成
+1. 调用 `@news-collector`（数据收集） → 保存到数据库（section_type="news"）
+2. 调用 `@news-report-generator`（生成文件） → 生成 `.parts/02-news.md`
 
-### 阶段4：生成事件报告
+**等待步骤1完成后，再开始步骤2**
 
-调用 `@report-assembler` 生成事件报告文件，传递基本参数
+#### 步骤2：摘要 + 图片（并行）
 
-**注意**：新版 `report-assembler` 会从数据库按需读取各部分数据
+**同时启动两个流程**：
+
+1. **摘要流程**：
+   - 调用 `@summary-builder`（数据收集） → 保存到数据库（section_type="summary"）
+   - 调用 `@summary-report-generator`（生成文件） → 生成 `.parts/01-summary.md`
+
+2. **图片流程**：
+   - 调用 `@images-builder`（数据收集） → 下载图片 → 保存到数据库（section_type="images"）
+   - 调用 `@images-report-generator`（生成文件） → 生成 `.parts/06-images.md`
+
+**关键**：
+- ⚠️ 步骤2 必须等待步骤1完成（因为 summary 和 images 都依赖 news 数据）
+- ✅ 步骤2中的两个流程可以并行执行
+- 等待所有流程完成后进入第三层
+
+---
+
+### 第三层：组装层
+
+调用 `@report-assembler` 生成最终事件报告
+
+**职责**：
+- 收集 `.parts/` 文件夹中的所有 md 文件
+- 按顺序合并：01-summary.md → 02-news.md → 03-validation.md → 04-timeline.md → 05-prediction.md → 06-images.md
+- 修正图片链接（使用相对路径）
+- 修正文件结构和内容错误
+- 生成最终报告 `{event_name}.md`
+
+**传递参数**：
+- event_name
+- session_id
+- report_timestamp
+- category
+- date
+
+---
+
+### 错误处理
+
+使用 `news-storage_get_report_sections_summary` 检查各部分状态：
+
+```json
+{
+  "summary": {
+    "validation": {"status": "completed"},
+    "timeline": {"status": "completed"},
+    "prediction": {"status": "failed", "error_message": "..."},
+    "news": {"status": "completed"},
+    "summary": {"status": "completed"},
+    "images": {"status": "completed"}
+  },
+  "total": 6,
+  "completed": 5,
+  "failed": 1
+}
+```
+
+某个任务失败时：
+- 标记状态但不阻塞整体流程
+- @report-assembler 会检测缺失的文件
+- 在最终报告中标注该部分生成失败
 
 ## 可用工具
 

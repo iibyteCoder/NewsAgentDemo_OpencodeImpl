@@ -10,7 +10,11 @@ hidden: true
 
 ## 核心职责
 
-从今日新闻数据中提取图片信息，下载图片，按照模板生成报告。
+从数据库读取图片元数据，按照模板生成相关图片报告部分。
+
+**⚠️ 重要变更**：
+- 图片下载和筛选由 `@images-builder` 负责
+- 本智能体只负责读取数据并生成 markdown 文件
 
 ## 输入
 
@@ -24,12 +28,15 @@ hidden: true
 
 ## 工作流程
 
-1. 从数据库读取新闻数据（`news-storage_get_report_section`，section_type="news"）
-2. **只处理今日新闻**的图片（从 `today_news` 提取）
-3. 创建图片文件夹（`{event_name}/`）
-4. 使用 `downloader_download_files` 批量下载图片
-5. 按照 `templates/sections/images-section-template.md` 填充模板
-6. 根据输出模式返回结果或写入文件
+1. 从数据库读取图片元数据（`news-storage_get_report_section`，section_type="images"）
+2. 检查图片数据状态
+3. 按照 `templates/sections/images-section-template.md` 填充模板
+4. 根据输出模式返回结果或写入文件
+
+**⚠️ 数据来源**：
+- 读取 section_type="images" 的数据（由 @images-builder 创建）
+- 不再读取 section_type="news"
+- 不再下载图片
 
 ## 输出格式
 
@@ -49,62 +56,66 @@ hidden: true
 
 ## 数据来源
 
+从数据库读取 section_type="images" 的数据：
+
 ```json
 {
-  "today_news": [
+  "images": [
     {
-      "title": "新闻标题",
-      "url": "https://...",
-      "image_urls": ["https://.../img1.jpg", "https://.../img2.png"]
+      "filename": "image1.jpg",
+      "original_url": "https://example.com/image1.jpg",
+      "local_path": "./事件名称/image1.jpg",
+      "source_news": "新闻标题",
+      "source_url": "https://example.com/news1",
+      "size": 102400,
+      "downloaded": true,
+      "relevance": "高"
     }
-  ]
+  ],
+  "total_count": 6,
+  "success_count": 6,
+  "failed_count": 0,
+  "skipped_count": 15
 }
 ```
 
-**⚠️ 重要**：只处理 `today_news` 中的图片，忽略 `related_news`。
-
-## 图片文件夹结构
-
-```
-./output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/
-├── {event_name}.md
-└── {event_name}/              ← 图片文件夹
-    ├── image1.jpg
-    ├── image2.png
-    └── ...
-```
+**⚠️ 重要**：
+- 数据由 @images-builder 准备
+- 包含已下载图片的元数据
+- 使用相对路径引用本地图片文件
 
 ## 可用工具
 
-- `news-storage_get_report_section` - 从数据库读取新闻数据
-- `downloader_download_files` - 批量下载图片
+- `news-storage_get_report_section` - 从数据库读取图片元数据
 - `write` - 写入文件
-- `bash` - 创建文件夹
+- ❌ **不再需要**：`downloader_download_files`、`bash`（由 @images-builder 负责）
 
 ## 关键要求
 
 1. **使用模板文件** - 严格按照 `templates/sections/images-section-template.md` 填充
-2. **只处理今日新闻** - 从 `today_news` 提取图片，忽略 `related_news`
-3. **相对路径** - 图片使用相对路径引用（`./{event_name}/image.jpg`）
+2. **使用数据库数据** - 从 section_type="images" 读取，使用 @images-builder 准备的数据
+3. **保持相对路径** - 直接使用数据中的 local_path，不要修改
 4. **按来源分组** - 相同新闻的图片放在一起
 5. **信息完整** - 每张图片包含：文件名、大小、来源、说明
+6. **状态标注** - 根据数据中的 success_count、failed_count 标注下载状态
 
 ## 注意事项
 
 **必须检查**：
 
-- ✅ 只处理今日新闻的图片
-- ✅ 所有图片使用相对路径
-- ✅ 图片文件夹正确创建
+- ✅ 从 section_type="images" 读取数据
+- ✅ 使用数据中的 local_path（相对路径）
 - ✅ 表格格式正确
+- ✅ 包含下载状态说明
 
-**路径规范**：
+**路径使用**：
 
-- ✅ 正确：`![图片](./{event_name}/image.jpg)`
-- ❌ 错误：`![图片](/output/report_...)`
+- ✅ 直接使用数据中的 `local_path` 字段
+- ✅ 正确格式：`![图片](./{event_name}/image.jpg)`
+- ❌ 不要修改或重建路径
 
 **错误处理**：
 
-- 如果没有图片，生成空部分并说明
-- 如果下载失败，在报告中标注
-- 如果文件夹创建失败，跳过图片下载
+- 如果数据库中没有图片数据，生成说明"无可用图片"
+- 如果部分图片下载失败，根据 failed_count 在报告中标注
+- 数据中包含 status="failed" 时，说明图片收集失败

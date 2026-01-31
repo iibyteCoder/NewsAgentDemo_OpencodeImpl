@@ -177,26 +177,45 @@
 
 ---
 
-### 第四层：分析级并行 (Event-Analyzer)
+### 第四层：事件处理三层架构 (Event-Analyzer)
 
-**位置**: `event-analyzer.md:72-83`
+**位置**: `event-analyzer.md:52-220`
 
-**职责**: 并发执行单个事件的三个分析任务
+**职责**: 使用三层架构处理单个事件，确保数据依赖正确
 
-**示例**:
+**架构说明**:
 ```text
 单个事件: "美国大选"
 
-并行启动:
-├── @validator - 验证事件真实性
-├── @timeline-builder - 构建事件时间轴
-└── @predictor - 预测事件发展趋势
-
-三个任务同时执行，全部完成后进入下一步
+【第一层：分析层】（并行执行）
+├── @validator → @validation-report-generator → 03-validation.md
+├── @timeline-builder → @timeline-report-generator → 04-timeline.md
+└── @predictor → @prediction-report-generator → 05-prediction.md
+    ↓
+【等待分析层完成】
+    ↓
+【第二层：内容层】（混合执行）
+    步骤1（串行）:
+    └── @news-collector → @news-report-generator → 02-news.md
+        ↓
+    【等待步骤1完成】
+        ↓
+    步骤2（并行）:
+    ├── @summary-builder → @summary-report-generator → 01-summary.md
+    └── @images-builder → @images-report-generator → 06-images.md
+        ↓
+【等待内容层完成】
+    ↓
+【第三层：组装层】
+└── @report-assembler → 合并所有 .parts 文件 → 最终报告
 ```
 
-**关键代码**:
-- ✅ 三个任务必须同时启动（并行执行）
+**关键要点**:
+- ✅ 第一层：三个分析任务完全并行（无依赖）
+- ✅ 第二层-步骤1：新闻流程串行执行
+- ✅ 第二层-步骤2：摘要和图片并行执行（依赖步骤1的news数据）
+- ✅ 第三层：纯文件操作，修正路径，生成最终报告
+- ❌ 不要在步骤2完成前启动（必须等待步骤1）
 - ❌ 不要等待一个任务完成后再启动下一个
 
 ---
