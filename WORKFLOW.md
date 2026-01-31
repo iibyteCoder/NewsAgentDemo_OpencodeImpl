@@ -429,9 +429,9 @@
 #### 步骤 2.4: 生成事件报告
 
 ```text
-调用 @report-generator 生成报告
+调用 @report-assembler 生成报告
 - 只传递基本参数
-- @report-generator 会从数据库按需读取数据
+- @report-assembler 会从数据库按需读取数据
 ```
 
 ---
@@ -586,11 +586,12 @@
 
 ```text
 ✅ 正确做法:
-@report-section-generator summary
-@report-section-generator news
-@report-section-generator validation
-@report-section-generator timeline
-@report-section-generator prediction
+@summary-report-generator
+@news-report-generator
+@validation-report-generator
+@timeline-report-generator
+@prediction-report-generator
+@images-report-generator
 
 所有部分同时生成，直接写入文件
 

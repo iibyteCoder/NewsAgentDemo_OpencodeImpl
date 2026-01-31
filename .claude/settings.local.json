@@ -24,7 +24,9 @@
       "Bash(dir:*)",
       "Bash(Get-ChildItem -Path \"d:\\\\myprojects\\\\PythonProjects\\\\LearningProjects\\\\OpencodeTest_1\" -Filter *.py -Recurse -File)",
       "Bash(Select-Object:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(py:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

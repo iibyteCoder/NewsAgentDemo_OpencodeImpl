@@ -99,6 +99,18 @@
         "news-storage*": true
       }
     },
+    "news-collector": {
+      "mode": "subagent",
+      "description": "新闻收集器 - 收集并分类新闻，保存到数据库",
+      "prompt": "{file:./prompts/news-collector.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 10,
+      "tools": {
+        "read": true,
+        "news-storage*": true
+      }
+    },
     "validator": {
       "mode": "subagent",
       "description": "事件验证器 - 验证事件真实性（主动探索型）",

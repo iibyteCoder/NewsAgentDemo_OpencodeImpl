@@ -104,9 +104,9 @@ hidden: true
 
 ### 阶段4：生成事件报告
 
-调用 `@report-generator` 生成事件报告文件，传递基本参数
+调用 `@report-assembler` 生成事件报告文件，传递基本参数
 
-**注意**：新版 `report-generator` 会从数据库按需读取各部分数据
+**注意**：新版 `report-assembler` 会从数据库按需读取各部分数据
 
 ## 可用工具
 
@@ -121,7 +121,7 @@ hidden: true
 - `@validator` - 验证事件真实性（保存到数据库）
 - `@timeline-builder` - 构建事件时间轴（保存到数据库）
 - `@predictor` - 预测事件发展趋势（保存到数据库）
-- `@report-generator` - 生成事件报告文件（从数据库读取）
+- `@report-assembler` - 生成事件报告文件（从数据库读取）
 
 ## 关键原则
 
@@ -209,7 +209,7 @@ category={category}
 ### 报告生成调用
 
 ```
-@report-generator 生成事件报告
+@report-assembler 生成事件报告
 event_name={event_name}
 session_id={session_id}
 report_timestamp={report_timestamp}
