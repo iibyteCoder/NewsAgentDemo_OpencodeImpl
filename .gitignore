@@ -32,3 +32,17 @@ downloads/
 
 # Output directory
 output/
+
+# Ruff cache
+.ruff_cache/
+
+# VSCode configuration
+.vscode/
+
+# Python cache in project directories
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Log files
+*.log
