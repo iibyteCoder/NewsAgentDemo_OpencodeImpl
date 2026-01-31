@@ -1,104 +1,52 @@
 # 新闻来源模板
 
-此模板定义了新闻来源部分的格式。
-
 ## 模板格式
 
-## 最新报道
+## 今日新闻
 
-{latest_news}
+{today_news}
 
-## 当日热点报道
+## 相关新闻
 
-{hot_news}
-
-## 权威分析报道
-
-{authoritative_news}
-
-## 其他媒体报道
-
-{other_media_news}
-
-## 历史参考报道
-
-{historical_news}
+{related_news}
 
 ---
 
 **统计信息**：
 
-- 新闻总数：{total_news_count}条
+- 今日新闻：{today_count}条
+- 相关新闻：{related_count}条
+- 总计：{total_count}条
 - 主要来源：{main_sources}
-- 时间范围：{time_range}
-- 涵盖内容：{content_types}
+
+---
 
 ## 说明
 
 ### 单条新闻格式
 
 ```markdown
-### {sequence_number}. {news_title}
+### {sequence}. [{title}]({url})
 
-- **来源**：{media_name}
+- **来源**：{source}
 - **时间**：{publish_time}
-- **链接**：[查看全文]({url})
-- **摘要**：{summary_content}
+- **摘要**：{summary}
 ```
-
-### 新闻分类
-
-**最新报道**（发布时间为最近3天）：
-- 最新的新闻动态
-- 实时行情数据
-- 突发事件报道
-
-**当日热点报道**（发布时间为事件当天）：
-- 事件发生日的重点报道
-- 多角度分析
-- 权威媒体深度报道
-
-**权威分析报道**（来自专业机构或专家）：
-- 专业分析平台观点
-- 专家评论
-- 研究机构报告
-
-**其他媒体报道**（国内其他媒体）：
-- 地方媒体报道
-- 行业媒体分析
-- 网络平台转载
-
-**历史参考报道**（发布时间较早但具有参考价值）：
-- 类似历史案例
-- 背景信息
-- 长期趋势分析
 
 ### 占位符说明
 
-- `{latest_news}` - 最新报道内容列表
-- `{hot_news}` - 当日热点报道内容列表
-- `{authoritative_news}` - 权威分析报道内容列表
-- `{other_media_news}` - 其他媒体报道内容列表
-- `{historical_news}` - 历史参考报道内容列表
-- `{total_news_count}` - 新闻总数
-- `{main_sources}` - 主要来源列表（用顿号分隔）
-- `{time_range}` - 时间范围描述
-- `{content_types}` - 涵盖内容类型描述
+- `{today_news}` - 今日新闻内容列表
+- `{related_news}` - 相关新闻内容列表
+- `{today_count}` - 今日新闻数量
+- `{related_count}` - 相关新闻数量
+- `{total_count}` - 总新闻数量
+- `{main_sources}` - 主要来源列表
 
-### 单条新闻字段说明
+### 单条新闻字段
 
-- `{sequence_number}` - 序号（1、2、3...）
-- `{news_title}` - 新闻标题
-- `{media_name}` - 媒体名称
-- `{publish_time}` - 发布时间（YYYY-MM-DD HH:MM:SS格式）
+- `{sequence}` - 序号（1、2、3...）
+- `{title}` - 新闻标题
 - `{url}` - 新闻链接
-- `{summary_content}` - 新闻摘要（100-500字）
-
-### 注意事项
-
-- ⭐⭐⭐ **完整呈现** - 包含所有新闻，不遗漏
-- ⭐⭐⭐ **信息完整** - 每条新闻包含：标题、链接、来源、时间、摘要
-- ⭐⭐ **时间倒序** - 按发布时间从新到旧排列
-- ⭐⭐ **合理分类** - 按时间和性质分组
-- ⭐ **格式统一** - 所有新闻使用相同格式
-- ⭐ **便于阅读** - 添加统计信息和分类标题
+- `{source}` - 媒体名称
+- `{publish_time}` - 发布时间
+- `{summary}` - 新闻摘要

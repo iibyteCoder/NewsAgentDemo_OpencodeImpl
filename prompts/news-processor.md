@@ -145,10 +145,11 @@ category: 科技
 
 ## 关键原则
 
-1. ⭐⭐⭐ **session_id 管理**：
-   - ⭐ **从 prompt 接收**：从调用方传递的 prompt 中获取 session_id
-   - ⭐ **禁止自己生成**：绝对不要自己生成或编造 session_id
+1. ⭐⭐⭐ **session_id 管理（最高优先级）**：
+   - ⭐ **来源唯一**：从调用方传递的 prompt 参数中获取
+   - ⭐ **禁止生成**：绝对不要使用随机字符串、时间戳或任何方式自己生成 session_id
    - ⭐ **用于数据库操作**：使用接收的 session_id 保存数据到数据库
+   - ⭐ **保持一致性**：整个处理过程中使用同一个 session_id
 2. ⭐⭐⭐ **只处理单个链接**：你的职责是处理一个新闻链接，不是搜索或批量处理
 3. ⭐⭐ **你有 fetch_article_content 工具权限**：你是唯一可以直接获取文章正文内容的智能体
    - 其他智能体（category-processor、validator、timeline-builder、predictor等）都没有此权限

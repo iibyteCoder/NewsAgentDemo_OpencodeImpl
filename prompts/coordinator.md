@@ -33,27 +33,32 @@ output/
 **使用系统命令生成**（根据当前系统选择）：
 
 **Windows PowerShell (推荐)**:
+
 ```powershell
 powershell -Command "Write-Host ('session_id: {0:yyyyMMdd}-{1}' -f (Get-Date), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); Write-Host ('report_timestamp: report_{0:yyyyMMdd_HHmmss}' -f (Get-Date))"
 ```
 
 **Windows CMD**:
+
 ```cmd
 echo session_id: %date:~0,4%%date:~5,2%%date:~8,2%-<random>
 echo report_timestamp: report_%date:~0,4%%date:~5,2%%date:~8%2_%time:~0,2%%time:~3,2%%time:~6,2%
 ```
 
 **Linux/Mac/Git Bash**:
+
 ```bash
 echo "session_id: $(date +%Y%m%d)-$(uuidgen | cut -c1-8)"
 echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
 ```
 
 **参数格式**：
+
 - `session_id`: `YYYYMMDD-xxxxxxxx` (8位随机字符)
 - `report_timestamp`: `report_YYYYMMDD_HHMMSS`
 
 **关键规则**：
+
 - ⭐⭐⭐ **唯一生成 session_id 的智能体**：其他所有智能体禁止生成
 - ⭐⭐⭐ **使用系统命令生成**：不要自己编造
 - ⭐⭐⭐ **一次 query 只执行一次**：所有子任务使用相同的值
@@ -125,10 +130,12 @@ echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
 **使用 bash 工具执行系统命令**生成会话参数。
 
 根据当前系统选择合适的命令（参见"全局参数"部分的命令示例），执行后从输出中提取：
+
 - `session_id` - 会话标识符
 - `report_timestamp` - 报告时间戳
 
 **重要**：
+
 - 必须使用 bash 工具执行命令生成
 - 只执行一次，整个流程使用相同的值
 - 不要自己编造这些参数
@@ -191,6 +198,7 @@ echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
 ```
 
 **策略**：
+
 - 只为成功的类别生成索引条目
 - 在总索引中标注失败的类别
 - 不要因为部分失败而终止整个流程

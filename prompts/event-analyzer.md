@@ -12,28 +12,12 @@ hidden: true
 
 对单个事件进行完整分析：验证真实性、构建时间轴、预测趋势，并生成事件报告。
 
-## 新版特性：数据库存储架构
+## 工作模式
 
-**关键变化**：
+子任务保存结果到数据库，报告生成器按需读取：
 
-- ❌ 旧版：子任务返回完整结果 → 传递给报告生成器 → 上下文过长
-- ✅ 新版：子任务保存结果到数据库 → 报告生成器按需读取
-
-**数据流**：
-
-```
-validator → 分析 → 保存到数据库 → 返回状态
-timeline-builder → 分析 → 保存到数据库 → 返回状态
-predictor → 分析 → 保存到数据库 → 返回状态
-                    ↓
-report-assembler → 按需读取数据 → 生成报告
-```
-
-**优势**：
-
-- 避免上下文过长导致信息丢失
-- 各智能体专注自己的职责
-- 数据可以在各部分之间共享和引用
+- **优势**：避免上下文过长、各智能体专注职责、数据可共享和引用
+- **流程**：子任务分析 → 保存数据库 → 返回状态 → 报告生成器按需读取
 
 ## 输入
 
@@ -86,25 +70,29 @@ report-assembler → 按需读取数据 → 生成报告
 ```
 
 **终止条件**：
+
 - `news-storage_search` 返回空结果
 - 新闻数量为 0
 - 新闻数据无效
 
 **不要继续执行**：
+
 - 不要启动任何分析任务
 - 不要调用 @validator、@timeline-builder、@predictor
 - 不要生成报告
 
-### 阶段2：并发启动三个分析任务（核心）
+### 阶段2：并发启动四个数据收集任务（核心）
 
-**必须并行调用** - 同时启动三个任务，所有任务并发执行，不要串行：
+**必须并行调用** - 同时启动四个任务，所有任务并发执行，不要串行：
 
+- `@news-collector` - 收集新闻数据，**保存到数据库**
 - `@validator` - 验证事件真实性，**保存到数据库**
 - `@timeline-builder` - 构建事件时间轴，**保存到数据库**
 - `@predictor` - 预测事件发展趋势，**保存到数据库**
 
 **关键**：
-- ✅ 三个任务必须同时启动（并行执行）
+
+- ✅ 四个任务必须同时启动（并行执行）
 - ❌ 不要等待一个任务完成后再启动下一个
 - 这些任务现在只返回状态，不返回完整数据
 
@@ -129,6 +117,7 @@ report-assembler → 按需读取数据 → 生成报告
 
 ### Sub Agent
 
+- `@news-collector` - 收集新闻数据（保存到数据库）
 - `@validator` - 验证事件真实性（保存到数据库）
 - `@timeline-builder` - 构建事件时间轴（保存到数据库）
 - `@predictor` - 预测事件发展趋势（保存到数据库）
@@ -136,11 +125,12 @@ report-assembler → 按需读取数据 → 生成报告
 
 ## 关键原则
 
-1. ⭐⭐⭐ **session_id 管理**：
-   - ⭐ **从 prompt 接收**：从调用方传递的 prompt 中获取 session_id
-   - ⭐ **禁止自己生成**：绝对不要自己生成或编造 session_id
-   - ⭐ **必须传递**：调用 @validator、@timeline-builder、@predictor 时必须传递 session_id
-2. ⭐⭐⭐ **三个分析任务必须并发** - 同时启动，不要等待
+1. ⭐⭐⭐ **session_id 管理（最高优先级）**：
+   - ⭐ **来源唯一**：从调用方传递的 prompt 参数中获取
+   - ⭐ **禁止生成**：绝对不要使用随机字符串、时间戳或任何方式自己生成 session_id
+   - ⭐ **必须传递**：调用子智能体时必须完整传递接收到的 session_id
+   - ⭐ **保持一致性**：整个处理过程中使用同一个 session_id
+2. ⭐⭐⭐ **四个数据收集任务必须并发** - 同时启动，不要等待
 3. ⭐⭐⭐ **只传递事件名称和参数** - 让子任务从数据库读取数据
 4. ⭐⭐⭐ **报告生成必须执行** - 分析失败时使用默认值继续
 5. ⭐⭐ **禁止直接获取文章内容**：你没有 `fetch_article_content` 工具权限
@@ -157,7 +147,7 @@ report-assembler → 按需读取数据 → 生成报告
 **必须完成**：
 
 - 读取事件新闻
-- 并发启动三个分析任务
+- 并发启动四个数据收集任务
 - 生成事件报告
 
 **步骤不足时降级**：
@@ -180,6 +170,11 @@ report-assembler → 按需读取数据 → 生成报告
 调用子任务时只传递必要参数：
 
 ```
+@news-collector 收集事件'{event_name}'的新闻数据
+session_id={session_id}
+category={category}
+date={date}
+
 @validator 验证事件'{event_name}'的真实性
 session_id={session_id}
 category={category}
@@ -200,12 +195,13 @@ category={category}
 ```json
 {
   "summary": {
+    "news": {"status": "completed", ...},
     "validation": {"status": "completed", ...},
     "timeline": {"status": "completed", ...},
     "prediction": {"status": "failed", "error_message": "..."}
   },
-  "total": 3,
-  "completed": 2,
+  "total": 4,
+  "completed": 3,
   "failed": 1
 }
 ```

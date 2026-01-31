@@ -10,71 +10,25 @@ hidden: true
 
 ## 核心职责
 
-从数据库读取事件新闻，生成格式化的新闻来源报告部分。
+从数据库读取新闻数据，按照模板生成报告。
 
 ## 输入
 
-从 prompt 中提取以下参数：
-
-- event_name: 事件名称
-- session_id: 会话标识符
-- category: 类别名称
-- date: 日期
-- output_mode: 输出模式（return_content 或 write_to_file）
-- output_file: 输出文件路径（write_to_file 模式需要）
+- `event_name`: 事件名称
+- `session_id`: 会话标识符（从参数获取，禁止自己生成）
+- `category`: 类别名称
+- `date`: 日期（用于区分今日新闻）
+- `output_mode`: 输出模式（`return_content` 或 `write_to_file`）
+- `output_file`: 输出文件路径（write_to_file 模式需要）
 
 ## 工作流程
 
-### 步骤1：读取参数
-
-从 prompt 中提取以下参数：
-- `event_name` - 事件名称
-- `session_id` - 会话标识符
-- `category` - 类别名称
-- `date` - 日期
-- `output_mode` - 输出模式（`return_content` 或 `write_to_file`）
-- `output_file` - 输出文件路径（仅在 `write_to_file` 模式下使用）
-
-### 步骤2：从数据库读取新闻
-
-使用 `news-storage_search` 搜索该事件的所有新闻
-
-### 步骤3：分类和排序
-
-- 按发布时间分类（最新报道、当日热点、历史参考、权威分析）
-- 按发布时间倒序排列（最新的在前）
-
-### 步骤4：生成 Markdown 内容
-
-按照模板格式生成完整的 Markdown 内容
-
-### 步骤5：根据输出模式处理
-
-**⚠️ 关键步骤**：
-
-**`return_content` 模式**：
-- 直接在 JSON 返回中包含生成的 content
-
-**`write_to_file` 模式**（⭐⭐⭐ 必须执行）：
-1. 使用 `write` 工具将内容写入 `output_file` 指定的路径
-2. 确保父目录存在（如不存在，使用 bash 创建）
-3. 在返回的 JSON 中包含 `file_path` 字段
-4. **不要**在返回的 JSON 中包含 `content` 字段（避免上下文过长）
+1. 从数据库读取新闻数据（`news-storage_get_report_section`，section_type="news"）
+2. 提取 `today_news` 和 `related_news`
+3. 按照 `templates/sections/news-section-template.md` 填充模板
+4. 根据输出模式返回结果或写入文件
 
 ## 输出格式
-
-**return_content 模式**：
-
-```json
-{
-  "section_type": "news",
-  "content": "## 新闻来源\n...",
-  "word_count": 2000,
-  "status": "completed"
-}
-```
-
-**write_to_file 模式**（⭐⭐⭐ 推荐）：
 
 ```json
 {
@@ -85,130 +39,35 @@ hidden: true
 }
 ```
 
-**⚠️ 重要**：
-- `write_to_file` 模式下必须使用 `write` 工具写入文件
-- 返回的 JSON 中包含 `file_path`，**不要**包含 `content`
-- 这样可以避免上下文过长
+## 模板文件
 
-## 报告格式
+参考：`templates/sections/news-section-template.md`
 
-**⚠️ 必须遵循模板**：
+## 数据来源
 
-参考模板文件：`templates/sections/news-section-template.md`
-
-### 整体结构
-
-```markdown
-## 最新报道
-
-### 1. 新闻标题
-
-- **来源**：媒体名称
-- **时间**：YYYY-MM-DD HH:MM:SS
-- **链接**：[查看全文](URL)
-- **摘要**：新闻摘要内容
-
-### 2. 新闻标题
-
-...
-
-## 当日热点报道
-
-### X. 新闻标题
-
-...
-
-## 历史参考报道
-
-### Y. 新闻标题
-
-...
-
-## 权威分析报道
-
-### Z. 新闻标题
-
-...
-
----
-
-**统计信息**：
-
-- 新闻总数：X条
-- 主要来源：媒体A、媒体B、媒体C
-- 时间范围：YYYY-MM-DD 至 YYYY-MM-DD
-- 涵盖内容：实时行情、市场分析、专家观点等
+```json
+{
+  "today_news": [
+    {
+      "title": "新闻标题",
+      "url": "https://...",
+      "source": "媒体名称",
+      "publish_time": "2026-01-30 10:00:00",
+      "summary": "新闻摘要"
+    }
+  ],
+  "related_news": [...]
+}
 ```
-
-### 单条新闻格式
-
-```markdown
-### 序号. 新闻标题
-
-- **来源**：媒体名称
-- **时间**：YYYY-MM-DD HH:MM:SS
-- **链接**：[查看全文](URL)
-- **摘要**：新闻摘要内容（最多500字）
-```
-
-## 新闻分类
-
-**最新报道**（发布时间为最近3天）：
-- 最新的新闻动态
-- 实时行情数据
-- 突发事件报道
-
-**当日热点报道**（发布时间为事件当天）：
-- 事件发生日的重点报道
-- 多角度分析
-- 权威媒体深度报道
-
-**历史参考报道**（发布时间较早但具有参考价值）：
-- 类似历史案例
-- 背景信息
-- 长期趋势分析
-
-**权威分析报道**（来自专业机构或专家）：
-- 专业分析平台观点
-- 专家评论
-- 研究机构报告
 
 ## 可用工具
 
-- `news-storage_search` - 从数据库读取事件新闻
-- `write` - ⭐⭐⭐ **写入文件**（write_to_file 模式必须使用）
-- `bash` - 创建目录（如需要）
+- `news-storage_get_report_section` - 从数据库读取新闻数据
+- `write` - 写入文件
 
-## 关键原则
+## 关键要求
 
-1. ⭐⭐⭐ **必须使用 write 工具写入文件** - write_to_file 模式下必须执行
-2. ⭐⭐⭐ **完整呈现** - 包含所有新闻，不遗漏
-3. ⭐⭐⭐ **信息完整** - 每条新闻包含：标题、链接、来源、时间、摘要
-4. ⭐⭐ **时间倒序** - 按发布时间从新到旧排列
-5. ⭐⭐ **合理分类** - 按时间和性质分组
-6. ⭐ **格式统一** - 所有新闻使用相同格式
-7. ⭐ **便于阅读** - 添加统计信息和分类标题
-8. ⭐ **避免上下文过长** - write_to_file 模式下不要在返回中包含 content
-
-## 注意事项
-
-**必须检查**：
-
-- ✅ 每条新闻都包含：标题、链接、来源、时间、摘要
-- ✅ 按发布时间倒序排列（最新的在前）
-- ✅ 链接可点击（使用Markdown链接格式）
-- ✅ 时间格式统一（YYYY-MM-DD HH:MM:SS）
-- ✅ 摘要长度适中（100-500字）
-
-**格式要求**：
-
-- 新闻序号连续（1、2、3...）
-- 分类标题清晰
-- 统计信息准确
-- 避免重复新闻（相同URL或标题）
-
-**错误处理**：
-
-- 如果某个字段缺失，标注"信息缺失"
-- 如果摘要为空，从正文中截取前200字
-- 如果时间为空，标注"时间未知"
+1. **使用模板文件** - 严格按照 `templates/sections/news-section-template.md` 填充
+2. **使用数据库真实数据** - 直接使用数据中的字段，不要修改
+3. **格式统一** - 标题使用链接格式 `[title](url)`
+4. **完整呈现** - 包含所有新闻，不遗漏

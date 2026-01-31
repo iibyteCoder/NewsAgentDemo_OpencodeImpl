@@ -95,6 +95,60 @@ SECTION_SUMMARY = "summary"
 SECTION_NEWS = "news"
 SECTION_IMAGES = "images"
 
+# 所有 section_type 的字典（用于文档和验证）
+SECTION_TYPES = {
+    SECTION_VALIDATION: "真实性验证 - 验证事件的真实性和可信度",
+    SECTION_TIMELINE: "事件时间轴 - 构建事件的发展脉络和关键时间节点",
+    SECTION_PREDICTION: "趋势预测 - 预测事件可能的发展趋势",
+    SECTION_SUMMARY: "事件摘要 - 生成事件的简要摘要",
+    SECTION_NEWS: "新闻来源 - 收集和分类相关新闻",
+    SECTION_IMAGES: "相关图片 - 收集今日新闻的相关图片",
+}
+
+# 所有 section_type 列表（用于验证）
+ALL_SECTION_TYPES = list(SECTION_TYPES.keys())
+
+
+def get_section_type_info(section_type: str) -> dict:
+    """获取指定 section_type 的信息
+
+    Args:
+        section_type: section 类型
+
+    Returns:
+        包含类型和描述的字典，如果不存在返回 None
+    """
+    if section_type in SECTION_TYPES:
+        return {
+            "type": section_type,
+            "description": SECTION_TYPES[section_type]
+        }
+    return None
+
+
+def get_all_section_types() -> list[dict]:
+    """获取所有可用的 section_type
+
+    Returns:
+        包含所有 section_type 信息的列表
+    """
+    return [
+        {"type": st, "description": desc}
+        for st, desc in SECTION_TYPES.items()
+    ]
+
+
+def is_valid_section_type(section_type: str) -> bool:
+    """验证 section_type 是否有效
+
+    Args:
+        section_type: 要验证的 section 类型
+
+    Returns:
+        是否为有效的 section_type
+    """
+    return section_type in SECTION_TYPES
+
 
 # 预定义的内容结构模板
 class ContentTemplates:

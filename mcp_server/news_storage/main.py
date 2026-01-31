@@ -34,6 +34,7 @@ from .tools.report_sections_tools import (
     get_report_sections_summary_tool,
     mark_section_failed_tool,
 )
+from .core import report_sections_model
 
 # 初始化服务器
 server = FastMCP("news_storage")
@@ -597,6 +598,39 @@ async def mark_section_failed(
         event_name=event_name,
         section_type=section_type,
         error_message=error_message,
+    )
+
+
+@server.tool(name="news-storage_list_section_types")
+async def list_section_types() -> str:
+    """列出所有报告部分类型 - 📋 类型参考
+
+    【核心功能】
+    - 列出所有可用的 section_type 值
+    - 确保保存和读取时使用一致的类型名称
+    - 避免拼写错误导致的数据不一致
+
+    【使用场景】
+    - 不确定应该使用什么 section_type 时
+    - 想查看系统支持哪些报告部分
+    - 验证某个 section_type 是否有效
+
+    Returns:
+        JSON格式：{success, section_types: [{type, description}, ...]}
+
+    Examples:
+        >>> # 查看所有可用的 section_type
+        >>> list_section_types()
+    """
+    import json
+    section_types = report_sections_model.get_all_section_types()
+    return json.dumps(
+        {
+            "success": True,
+            "section_types": section_types,
+        },
+        ensure_ascii=False,
+        indent=2,
     )
 
 
