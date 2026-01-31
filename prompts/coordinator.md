@@ -22,16 +22,42 @@ output/
     └── ...
 ```
 
-## 全局参数（必须首先生成）
+## 全局参数（使用系统命令生成）
 
-你是唯一生成这些参数的 Agent
+**必须首先生成**全局参数，所有子任务共享相同的参数值。
+
+**⚠️⚠️⚠️ 重要：session_id 生成规则**
+
+你是系统中**唯一**允许生成 `session_id` 的智能体。其他所有智能体都**严禁自己生成 session_id**。
+
+**使用系统命令生成**（根据当前系统选择）：
+
+**Windows PowerShell (推荐)**:
+```powershell
+powershell -Command "Write-Host ('session_id: {0:yyyyMMdd}-{1}' -f (Get-Date), [System.Guid]::NewGuid().ToString('N').Substring(0,8)); Write-Host ('report_timestamp: report_{0:yyyyMMdd_HHmmss}' -f (Get-Date))"
+```
+
+**Windows CMD**:
+```cmd
+echo session_id: %date:~0,4%%date:~5,2%%date:~8,2%-<random>
+echo report_timestamp: report_%date:~0,4%%date:~5,2%%date:~8%2_%time:~0,2%%time:~3,2%%time:~6,2%
+```
+
+**Linux/Mac/Git Bash**:
+```bash
+echo "session_id: $(date +%Y%m%d)-$(uuidgen | cut -c1-8)"
+echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
+```
+
+**参数格式**：
+- `session_id`: `YYYYMMDD-xxxxxxxx` (8位随机字符)
+- `report_timestamp`: `report_YYYYMMDD_HHMMSS`
 
 **关键规则**：
-
-- ⭐ 一次 query 只生成一个 `report_timestamp`
-- ⭐ 所有子任务使用这个时间戳
-- ⭐ 时间戳格式：`report_YYYYMMDD_HHMMSS`（如：`report_20260130_153000`）
-- ⭐ session_id 格式：`YYYYMMDD-随机8位`（如：`20260130-a3b4c6d9`）
+- ⭐⭐⭐ **唯一生成 session_id 的智能体**：其他所有智能体禁止生成
+- ⭐⭐⭐ **使用系统命令生成**：不要自己编造
+- ⭐⭐⭐ **一次 query 只执行一次**：所有子任务使用相同的值
+- ⭐⭐⭐ **调用子任务时必须传递**：确保 session_id 在 prompt 中
 
 ## 查询模式识别（核心功能）
 
@@ -96,7 +122,16 @@ output/
 
 ### 步骤1：生成全局参数
 
-在对话开始时生成一次（保持整个流程不变）
+**使用 bash 工具执行系统命令**生成会话参数。
+
+根据当前系统选择合适的命令（参见"全局参数"部分的命令示例），执行后从输出中提取：
+- `session_id` - 会话标识符
+- `report_timestamp` - 报告时间戳
+
+**重要**：
+- 必须使用 bash 工具执行命令生成
+- 只执行一次，整个流程使用相同的值
+- 不要自己编造这些参数
 
 ### 步骤2：解析需求，识别类别和事件
 
@@ -116,6 +151,49 @@ output/
 ### 步骤4：等待所有任务完成
 
 收集所有类别的处理结果
+
+### ⚠️ 数据检查：整体结果验证
+
+**关键检查**：必须检查是否有类别成功生成数据
+
+- ✅ 至少1个类别有数据 → 继续生成总索引
+- ❌ **所有类别都无数据 → 返回部分完成状态**
+
+**部分完成的处理**：
+
+```json
+{
+  "categories": ["体育", "政治", "科技"],
+  "status": "partial_no_data",
+  "total_events": 0,
+  "message": "⚠️ 所有类别都未找到相关新闻",
+  "successful_categories": [],
+  "failed_categories": ["体育", "政治", "科技"],
+  "errors": {
+    "体育": "未找到相关新闻",
+    "政治": "未找到相关新闻",
+    "科技": "未找到相关新闻"
+  }
+}
+```
+
+**混合情况的处理**（部分成功、部分失败）：
+
+```json
+{
+  "categories": ["体育", "政治", "科技"],
+  "status": "partial_completed",
+  "total_events": 10,
+  "message": "⚠️ 部分类别未找到数据：科技",
+  "successful_categories": ["体育", "政治"],
+  "failed_categories": ["科技"]
+}
+```
+
+**策略**：
+- 只为成功的类别生成索引条目
+- 在总索引中标注失败的类别
+- 不要因为部分失败而终止整个流程
 
 ### 步骤5：生成总索引
 
@@ -164,7 +242,8 @@ output/
 - 模式：广泛模式
 
 执行：
-- 启动3个任务，每个任务处理该类别所有事件
+- **并行启动3个类别任务**，所有任务同时执行
+- 每个任务独立处理该类别的所有事件
 - 结果：生成所有类别的完整报告
 ```
 
@@ -194,6 +273,7 @@ output/
 - 类别2：体育，精确模式（只处理NBA）
 
 执行：
+- **并行启动2个类别任务**，同时执行
 - 科技：处理所有事件
 - 体育：只处理NBA相关事件
 ```
@@ -216,7 +296,7 @@ output/
 
 当接收到用户需求时，按以下顺序执行：
 
-1. **生成全局参数**：`session_id` 和 `report_timestamp`
+1. **生成全局参数**：调用脚本获取 `session_id` 和 `report_timestamp`
 2. **解析需求**：识别类别和事件级别
 3. **并行启动任务**：为每个类别启动 `@category-processor`（传递参数）
 4. **等待完成**：收集所有任务结果

@@ -16,3 +16,10 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "trafilatura",
 ]
+
+[tool.setuptools]
+packages = ["mcp_server", "prompts", "templates"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

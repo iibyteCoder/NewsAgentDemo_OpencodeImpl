@@ -84,16 +84,17 @@ hidden: true
 ```
 ./output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/
 ├── {event_name}.md       ← 最终报告文件（通过文件合并生成）
-├── {event_name}/         ← 事件图片文件夹
-│   ├── 图片1.png
-│   └── 图片2.png
-└── .parts/               ← 临时部分文件夹（可删除）
-    ├── 01-summary.md
-    ├── 02-news.md
-    ├── 03-validation.md
-    ├── 04-timeline.md
-    ├── 05-prediction.md
-    └── 06-images.md
+└── {event_name}/         ← 事件文件夹（隔离并发访问）
+    ├── .parts/           ← 临时部分文件夹（每个事件独立，可删除）
+    │   ├── 01-summary.md
+    │   ├── 02-news.md
+    │   ├── 03-validation.md
+    │   ├── 04-timeline.md
+    │   ├── 05-prediction.md
+    │   └── 06-images.md
+    └── images/           ← 图片文件夹
+        ├── 图片1.png
+        └── 图片2.png
 ```
 
 ## 可用工具
@@ -102,11 +103,15 @@ hidden: true
 
 ## 关键原则
 
-1. ⭐⭐⭐ **委托组装器** - 所有复杂逻辑委托给 `report-assembler`
-2. ⭐⭐⭐ **分步生成** - 每个部分独立生成，避免上下文过长
-3. ⭐⭐⭐ **文件操作** - 使用文件合并，不读取内容到上下文
-4. ⭐ **统一时间戳** - 使用传递的 `report_timestamp`
-5. ⭐ **相对路径** - 图片使用相对路径引用
+1. ⭐⭐⭐ **session_id 管理**：
+   - ⭐ **从 prompt 接收**：从调用方传递的 prompt 中获取 session_id
+   - ⭐ **禁止自己生成**：绝对不要自己生成或编造 session_id
+   - ⭐ **必须传递**：调用 @report-assembler 时必须传递 session_id
+2. ⭐⭐⭐ **委托组装器** - 所有复杂逻辑委托给 `report-assembler`
+3. ⭐⭐⭐ **分步生成** - 每个部分独立生成，避免上下文过长
+4. ⭐⭐⭐ **文件操作** - 使用文件合并，不读取内容到上下文
+5. ⭐ **统一时间戳** - 使用传递的 `report_timestamp`
+6. ⭐ **相对路径** - 图片使用相对路径引用
 
 ## 优先级
 
@@ -150,7 +155,7 @@ hidden: true
 
 ### 调试技巧
 
-如果遇到问题，可以查看 `.parts/` 文件夹中的中间文件，定位哪个部分生成有问题
+如果遇到问题，可以查看 `{event_name}/.parts/` 文件夹中的中间文件，定位哪个部分生成有问题
 
 ## 版本历史
 

@@ -35,10 +35,6 @@
       "description": "新闻协调器 - 多类别新闻收集协调器",
       "temperature": 0.2,
       "prompt": "{file:./prompts/coordinator.md}",
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
       "tools": {
         "write": true,
         "read": true
@@ -56,10 +52,6 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 30,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
       "tools": {
         "write": true,
         "edit": true,
@@ -83,17 +75,14 @@
     },
     "news-processor": {
       "mode": "subagent",
-      "description": "新闻数据预处理专家 - 处理和标准化单条新闻数据",
+      "description": "新闻数据保存专家 - 处理单个新闻链接并保存到数据库",
       "prompt": "{file:./prompts/news-processor.md}",
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 8,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
       "tools": {
         "read": true,
-        "web-browser*": true,
+        "web-browser_fetch_article_content": true,
         "news-storage*": true,
         "downloader*": true
       }
@@ -105,9 +94,6 @@
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 10,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
       "tools": {
         "read": true,
         "news-storage*": true
@@ -120,18 +106,18 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 15,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
       "tools": {
         "write": false,
         "edit": false,
         "bash": false,
-        "web-browser_*": true,
+        "web-browser_multi_search_tool": true,
         "news-storage*": true,
         "web-browser_fetch_article_content": false
       },
       "permission": {
+        "task": {
+          "news-processor": "allow"
+        },
         "bash": {
           "python *": "allow"
         }
@@ -144,18 +130,18 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 20,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
       "tools": {
         "write": false,
         "edit": false,
         "bash": false,
-        "web-browser_*": true,
+        "web-browser_multi_search_tool": true,
         "news-storage*": true,
         "web-browser_fetch_article_content": false
       },
       "permission": {
+        "task": {
+          "news-processor": "allow"
+        },
         "bash": {
           "python *": "allow"
         }
@@ -168,18 +154,18 @@
       "hidden": true,
       "temperature": 0.3,
       "maxSteps": 15,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}"
-      },
       "tools": {
         "write": false,
         "edit": false,
         "bash": false,
-        "web-browser_*": true,
+        "web-browser_multi_search_tool": true,
         "news-storage*": true,
         "web-browser_fetch_article_content": false
       },
       "permission": {
+        "task": {
+          "news-processor": "allow"
+        },
         "bash": {
           "python *": "allow"
         }
@@ -192,10 +178,6 @@
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 25,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
       "tools": {
         "write": false,
         "edit": false,
@@ -217,10 +199,6 @@
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 20,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
       "tools": {
         "write": true,
         "bash": false,
@@ -232,6 +210,91 @@
         }
       }
     },
+    "summary-report-generator": {
+      "mode": "subagent",
+      "description": "事件摘要报告生成器 - 专门生成事件摘要部分",
+      "prompt": "{file:./prompts/summary-report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 6,
+      "tools": {
+        "write": true,
+        "read": true,
+        "news-storage*": true
+      }
+    },
+    "news-report-generator": {
+      "mode": "subagent",
+      "description": "新闻来源报告生成器 - 专门生成新闻来源部分",
+      "prompt": "{file:./prompts/news-report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 8,
+      "tools": {
+        "write": true,
+        "read": true,
+        "news-storage*": true
+      }
+    },
+    "validation-report-generator": {
+      "mode": "subagent",
+      "description": "真实性验证报告生成器 - 专门生成真实性验证部分",
+      "prompt": "{file:./prompts/validation-report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 8,
+      "tools": {
+        "write": true,
+        "read": true,
+        "news-storage*": true
+      }
+    },
+    "timeline-report-generator": {
+      "mode": "subagent",
+      "description": "事件时间轴报告生成器 - 专门生成事件时间轴部分",
+      "prompt": "{file:./prompts/timeline-report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 8,
+      "tools": {
+        "write": true,
+        "read": true,
+        "news-storage*": true
+      }
+    },
+    "prediction-report-generator": {
+      "mode": "subagent",
+      "description": "趋势预测报告生成器 - 专门生成趋势预测部分",
+      "prompt": "{file:./prompts/prediction-report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 8,
+      "tools": {
+        "write": true,
+        "read": true,
+        "news-storage*": true
+      }
+    },
+    "images-report-generator": {
+      "mode": "subagent",
+      "description": "相关图片报告生成器 - 专门生成相关图片部分",
+      "prompt": "{file:./prompts/images-report-generator.md}",
+      "hidden": true,
+      "temperature": 0.1,
+      "maxSteps": 10,
+      "tools": {
+        "write": true,
+        "bash": true,
+        "read": true,
+        "downloader*": true,
+        "news-storage*": true
+      },
+      "permission": {
+        "bash": {
+          "mkdir *": "allow"
+        }
+      }
+    },
     "report-assembler": {
       "mode": "subagent",
       "description": "报告组装器 - 分步生成并组装完整报告（纯文件操作）",
@@ -239,10 +302,6 @@
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 30,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
       "tools": {
         "write": true,
         "bash": true,
@@ -258,30 +317,12 @@
           "echo *": "allow"
         },
         "task": {
-          "report-section-generator": "allow"
-        }
-      }
-    },
-    "report-section-generator": {
-      "mode": "subagent",
-      "description": "报告部分生成器 - 独立生成报告的某个部分",
-      "prompt": "{file:./prompts/report-section-generator.md}",
-      "hidden": true,
-      "temperature": 0.1,
-      "maxSteps": 10,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
-      "tools": {
-        "write": true,
-        "bash": true,
-        "read": true
-      },
-      "permission": {
-        "bash": {
-          "mkdir *": "allow",
-          "python *": "allow"
+          "summary-report-generator": "allow",
+          "news-report-generator": "allow",
+          "validation-report-generator": "allow",
+          "timeline-report-generator": "allow",
+          "prediction-report-generator": "allow",
+          "images-report-generator": "allow"
         }
       }
     },
@@ -292,10 +333,6 @@
       "hidden": true,
       "temperature": 0.1,
       "maxSteps": 15,
-      "env": {
-        "OPENCODE_SESSION_ID": "{date:YYYYMMDD}-{uuid:8}",
-        "OPENCODE_REPORT_TIMESTAMP": "report_{date:YYYYMMDD}_{time:HHMMSS}"
-      },
       "tools": {
         "write": true,
         "bash": true,
