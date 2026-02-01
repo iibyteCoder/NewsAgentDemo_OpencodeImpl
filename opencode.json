@@ -45,7 +45,7 @@
         }
       }
     },
-    "category-processor": {
+    "category-handler": {
       "mode": "subagent",
       "description": "新闻资讯收集智能体 - 单类别处理器",
       "prompt": "{file:./prompts/category-handler.md}",
@@ -371,7 +371,7 @@
         }
       }
     },
-    "synthesizer": {
+    "category-indexer": {
       "mode": "subagent",
       "description": "类别索引生成器 - 生成类别级的index.md索引文件",
       "prompt": "{file:./prompts/category-indexer.md}",

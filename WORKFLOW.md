@@ -292,7 +292,7 @@
 
 3. **并行启动类别任务**
    ```text
-   为每个类别启动 @category-processor
+   为每个类别启动 @category-handler
    ├── 传递 session_id
    ├── 传递 report_timestamp
    └── 传递 category, specific_events
