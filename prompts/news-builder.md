@@ -87,14 +87,44 @@ hidden: true
 - 搜索关键词：事件名称
 - 收集新闻链接
 
-**并行处理搜索结果**：
+#### 并行处理搜索结果
+
+##### ⚠️ 重要：提供完整信息避免丢失
+
+在调用 `@news-processor` 时，**强烈建议传递完整的新闻信息**，而不仅仅是 URL：
+
+- ✅ **推荐**：如果搜索结果包含 `title`、`publish_time`、`source` 等信息，**务必传递**
+- ✅ **原因**：避免网页结构变化、反爬虫、网络问题导致的信息提取失败
+- ✅ **好处**：即使网页无法访问，也能保存已有的关键信息
 
 使用 Task 工具并行调用 `@news-processor` 处理每条新闻：
 
+**推荐方式**：提供完整新闻数据
+
 ```
-Task(@news-processor, url="新闻链接1")
-Task(@news-processor, url="新闻链接2")
-...
+Task("@news-processor", prompt=f"""
+处理这条新闻：
+{{
+  "title": "{news_title}",
+  "url": "{news_url}",
+  "publish_time": "{news_publish_time}",
+  "source": "{news_source}"
+}}
+
+session_id: {session_id}
+category: {category}
+""")
+```
+
+**不推荐方式**：只提供 URL（可能丢失信息）
+
+```
+Task("@news-processor", prompt=f"""
+处理这个链接：{news_url}
+
+session_id: {session_id}
+category: {category}
+""")
 ```
 
 等待所有 @news-processor 完成后，收集处理结果。
@@ -196,7 +226,7 @@ Task("@news-report-generator", prompt=f"""
 使用 web-browser_multi_search_tool 搜索关键词："{event_name}"
 ```
 
-### 并行处理搜索结果
+### 调用 news-processor
 
 ```
 对于每条新闻链接：

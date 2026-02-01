@@ -68,11 +68,46 @@ maxSteps: 30
 
 **关键**：所有链接必须同时调用 @news-processor，并行处理
 
+#### ⚠️ 重要：提供完整信息避免丢失
+
+在调用 @news-processor 时，**强烈建议传递完整的新闻信息**，而不仅仅是 URL：
+
+- ✅ **推荐**：如果搜索结果包含 `title`、`publish_time`、`source`、`author` 等信息，**务必传递**
+- ✅ **原因**：避免网页结构变化、反爬虫、网络问题导致的信息提取失败
+- ✅ **好处**：即使网页无法访问，也能保存已有的关键信息
+
 传递参数：
 
-- url: 新闻链接
-- session_id
-- category
+**方式 1（推荐）**：提供完整新闻数据
+
+```python
+Task("@news-processor", prompt=f"""
+处理这条新闻：
+{{
+  "title": "{news_title}",
+  "url": "{news_url}",
+  "publish_time": "{news_publish_time}",
+  "source": "{news_source}",
+  "author": "{news_author}"
+}}
+
+session_id: {session_id}
+category: {category}
+""")
+```
+
+**方式 2（不推荐）**：只提供 URL（可能丢失信息）
+
+```python
+Task("@news-processor", prompt=f"""
+处理这个链接：{news_url}
+
+session_id: {session_id}
+category: {category}
+""")
+```
+
+**注意**：优先使用方式 1，只有在搜索结果不包含详细信息时才使用方式 2。
 
 ### 4. 聚合为事件
 

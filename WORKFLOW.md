@@ -318,12 +318,17 @@
 
 **关键步骤**: 并行调用 `@news-processor`
 
+**⚠️ 重要**：调用时如果搜索结果包含 `title`、`publish_time`、`source` 等信息，**务必传递**给 @news-processor，避免因网页问题导致信息丢失。
+
 ```text
-✅ 正确做法:
+✅ 推荐做法（传递完整信息）:
+@news-processor 处理这条新闻：{"title": "...", "url": "...", "publish_time": "..."} session_id=xxx category=体育
+@news-processor 处理这条新闻：{"title": "...", "url": "...", "publish_time": "..."} session_id=xxx category=体育
+... (所有链接同时调用)
+
+⚠️ 备选做法（只提供 URL，可能丢失信息）:
 @news-processor 处理 url1 session_id=xxx category=体育
 @news-processor 处理 url2 session_id=xxx category=体育
-@news-processor 处理 url3 session_id=xxx category=体育
-... (所有链接同时调用)
 
 ❌ 错误做法:
 处理 url1 → 等待完成 → 处理 url2 → 等待完成 → ...
@@ -339,6 +344,7 @@
 **优化点**:
 - ❌ **不再检查重复性** (移除 `news-storage_get_by_url`)
 - 直接并行处理所有链接
+- ✅ **优先传递完整信息**（包含 title、publish_time 等），避免网页访问失败导致的信息丢失
 
 ---
 
