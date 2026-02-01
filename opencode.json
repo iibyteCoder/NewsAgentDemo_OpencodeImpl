@@ -93,7 +93,7 @@
       "prompt": "{file:./prompts/news-aggregator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 10,
+      "maxSteps": 25,
       "tools": {
         "read": true,
         "news-storage*": true
@@ -105,7 +105,7 @@
       "prompt": "{file:./prompts/news-builder.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 15,
+      "maxSteps": 30,
       "tools": {
         "read": true,
         "web-browser_multi_search_tool": true,
@@ -149,7 +149,7 @@
       "prompt": "{file:./prompts/timeline-builder.md}",
       "hidden": true,
       "temperature": 0.2,
-      "maxSteps": 20,
+      "maxSteps": 35,
       "tools": {
         "write": false,
         "edit": false,
@@ -199,7 +199,7 @@
       "prompt": "{file:./prompts/summary-builder.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 25,
       "tools": {
         "read": true,
         "news-storage*": true
@@ -216,7 +216,7 @@
       "prompt": "{file:./prompts/images-builder.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 10,
+      "maxSteps": 40,
       "tools": {
         "read": true,
         "bash": true,
@@ -277,7 +277,7 @@
       "prompt": "{file:./prompts/summary-report-generator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 6,
+      "maxSteps": 20,
       "tools": {
         "write": true,
         "read": true,
@@ -290,7 +290,7 @@
       "prompt": "{file:./prompts/news-report-generator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 20,
       "tools": {
         "write": true,
         "read": true,
@@ -303,7 +303,7 @@
       "prompt": "{file:./prompts/validation-report-generator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 20,
       "tools": {
         "write": true,
         "read": true,
@@ -316,7 +316,7 @@
       "prompt": "{file:./prompts/timeline-report-generator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 20,
       "tools": {
         "write": true,
         "read": true,
@@ -329,7 +329,7 @@
       "prompt": "{file:./prompts/prediction-report-generator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 20,
       "tools": {
         "write": true,
         "read": true,
@@ -342,7 +342,7 @@
       "prompt": "{file:./prompts/images-report-generator.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 20,
       "tools": {
         "write": true,
         "read": true,

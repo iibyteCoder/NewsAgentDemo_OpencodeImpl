@@ -3,6 +3,7 @@
 import json
 import re
 from typing import Optional
+from urllib.parse import urljoin
 
 from loguru import logger
 from playwright.async_api import Page
@@ -16,6 +17,68 @@ from ..engines.serper import SerperEngine
 from ..utils.helpers import get_random_user_agent, search_result_to_dict
 
 
+# ========== 常量定义 ==========
+# 图片过滤相关常量
+DATA_IMAGE_PREFIX = "data:image"
+MIN_IMAGE_URL_LENGTH = 20
+MIN_IMAGE_SIZE = 100
+
+# 无关图片关键词（用于URL过滤）
+UNWANTED_IMAGE_KEYWORDS = [
+    "icon", "logo", "pixel", "tracking", "avatar",
+    "ad", "banner", "sponsor", "affiliate",
+    "share", "social", "facebook", "twitter", "weibo",
+    "wechat", "qq", "arrow", "bullet", "separator",
+    "divider", "background", "pattern", "watermark",
+    "qr-code", "qrcode", "barcode", "captcha",
+    "loading", "spinner", "placeholder", "default",
+    "thumb", "thumbnail", "small", "mini", "tiny",
+]
+
+# 有效图片扩展名
+VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
+
+# 无关区域选择器
+UNWANTED_PARENT_SELECTORS = [
+    'header', 'footer', 'nav', 'aside', '.sidebar',
+    '.header', '.footer', '.navigation', '.menu',
+    '.advertisement', '.ad', '.ad-banner', '.ad-container',
+    '.share', '.social', '.social-share', '.sharing',
+    '.comment', '.comments', '.related', '.recommended',
+    '.author-info', '.author-bio', '.sidebar-content',
+    '[class*="ad-"]', '[class*="advertisement"]',
+    '[id*="ad-"]', '[id*="advertisement"]',
+    '.widget', '.widgets', '.sidebar-widget',
+    '.newsletter', '.subscribe', '.subscription',
+    '.breadcrumb', '.breadcrumbs', '.pager', '.pagination',
+]
+
+# 正文区域选择器
+CONTENT_SELECTORS = [
+    'article',
+    '[role="article"]',
+    'article .article-content',
+    'article .content',
+    'article .post-content',
+    'article .entry-content',
+    'article .article-body',
+    'article .post-body',
+    'main .content',
+    'main .article-content',
+    'main .post-content',
+    'main .entry-content',
+    '.article-content',
+    '.post-content',
+    '.entry-content',
+    '.article-body',
+    '.post-body',
+    '.news-content',
+    '#article-content',
+    '#post-content',
+    '#content',
+]
+
+
 # 全局实例
 _settings = get_settings()
 _browser_pool = get_browser_pool(_settings)
@@ -25,6 +88,78 @@ _rate_limiter = RateLimiter(
     max_engine_requests=_settings.max_engine_requests_per_second,
 )
 _engine_factory = EngineFactory(enabled_engines=_settings.enabled_engines)
+
+
+# ========== 图片过滤辅助函数 ==========
+
+
+def _is_valid_image_url(url: str) -> bool:
+    """检查图片URL是否有效
+
+    Args:
+        url: 图片URL
+
+    Returns:
+        是否为有效的图片URL
+    """
+    if not url or len(url) < MIN_IMAGE_URL_LENGTH:
+        return False
+
+    if url.startswith(DATA_IMAGE_PREFIX):
+        return False
+
+    url_lower = url.lower()
+
+    # 检查是否包含无关关键词
+    if any(kw in url_lower for kw in UNWANTED_IMAGE_KEYWORDS):
+        return False
+
+    # 检查是否为有效图片格式
+    if not any(ext in url_lower for ext in VALID_IMAGE_EXTENSIONS):
+        return False
+
+    return True
+
+
+def _normalize_image_url(url: str, base_url: str) -> str:
+    """规范化图片URL（处理相对路径）
+
+    Args:
+        url: 图片URL（可能是相对路径）
+        base_url: 基础URL
+
+    Returns:
+        规范化后的完整URL
+    """
+    if url.startswith("//"):
+        return "https:" + url
+    elif url.startswith("/"):
+        return urljoin(base_url, url)
+    elif not url.startswith("http"):
+        return urljoin(base_url, url)
+    return url
+
+
+def _create_image_dict(index: int, url: str, alt: str = "", width: int = 0, height: int = 0) -> dict:
+    """创建图片信息字典
+
+    Args:
+        index: 图片索引
+        url: 图片URL
+        alt: 图片alt文本
+        width: 图片宽度
+        height: 图片高度
+
+    Returns:
+        图片信息字典
+    """
+    return {
+        "index": index,
+        "url": url,
+        "alt": alt,
+        "width": width,
+        "height": height,
+    }
 
 
 async def _check_anti_bot(page: Page, url: str) -> tuple[bool, str]:
@@ -685,10 +820,13 @@ def _clean_content(content: str) -> str:
 async def _extract_images(page, base_url: str) -> list[dict]:
     """提取文章中的图片链接（使用专业工具）
 
-    优先级:
-    1. newspaper3k - 专门的新闻文章提取库
-    2. trafilatura - 成熟的内容提取库
-    3. JavaScript 备用方案
+    优先级调整说明:
+    1. JavaScript 备用方案 - 最严格的正文区域检测，过滤无关图片
+    2. newspaper3k - 作为备选
+    3. trafilatura - 作为最后备选
+
+    原因：newspaper3k 会提取整个页面的图片，包括相关文章、缩略图等
+    而 JavaScript fallback 有10层过滤逻辑，能更准确地提取正文图片
 
     Args:
         page: Playwright页面对象
@@ -697,57 +835,50 @@ async def _extract_images(page, base_url: str) -> list[dict]:
     Returns:
         图片信息列表，每个图片包含 url, alt, width, height
     """
-    html = await page.content()
+    # 方法1: 优先使用 JavaScript 方案（最严格的过滤）
+    result = await _extract_images_fallback(page, base_url)
+    if result:
+        return result
 
-    # 方法1: 尝试使用 newspaper3k
+    # 方法2: newspaper3k 作为备选
+    html = await page.content()
+    result = _extract_images_newspaper3k(html, base_url)
+    if result:
+        return result
+
+    # 方法3: trafilatura 作为最后备选
+    result = _extract_images_trafilatura(html, base_url)
+    return result
+
+
+def _extract_images_newspaper3k(html: str, base_url: str) -> list[dict]:
+    """使用 newspaper3k 提取图片"""
     try:
         from newspaper import Article, Config
 
-        # 配置 newspaper3k
         config = Config()
         config.browser_user_agent = "Mozilla/5.0"
-        config.fetch_images = False  # 不下载图片，只提取URL
+        config.fetch_images = False
         config.request_timeout = 10
 
         article = Article(url=base_url, config=config)
         article.set_html(html)
         article.parse()
 
-        # newspaper3k 提取的图片列表
+        # 提取图片列表
         if article.images and len(article.images) > 0:
-            # 过滤掉 base64 图片、小图标等无关图片
-            valid_images = []
-            for url in article.images:
-                # 跳过 base64 编码的图片
-                if url.startswith("data:image"):
-                    continue
-                # 跳过明显的小图标
-                if any(keyword in url.lower() for keyword in ["icon", "logo", "pixel", "tracking", "avatar"]):
-                    continue
-                # 跳过太短的URL
-                if len(url) < 20:
-                    continue
-                valid_images.append(url)
+            valid_images = [url for url in article.images if _is_valid_image_url(url)]
 
             if valid_images:
                 logger.info(f"   ✅ newspaper3k 提取到 {len(valid_images)} 个有效图片 (原始{len(article.images)}个)")
-                return [
-                    {"index": i + 1, "url": url, "alt": "", "width": 0, "height": 0}
-                    for i, url in enumerate(valid_images)
-                ]
+                return [_create_image_dict(i + 1, url) for i, url in enumerate(valid_images)]
             else:
                 logger.info("   ⚠️ newspaper3k 提取的图片都被过滤掉了")
 
-        elif article.top_img:
-            # 检查主图是否有效
-            top_img = article.top_img
-            if (
-                not top_img.startswith("data:image")
-                and len(top_img) >= 20
-                and not any(keyword in top_img.lower() for keyword in ["icon", "logo", "pixel"])
-            ):
-                logger.info(f"   ✅ newspaper3k 提取到主图: {top_img}")
-                return [{"index": 1, "url": top_img, "alt": "", "width": 0, "height": 0}]
+        # 检查主图
+        elif article.top_img and _is_valid_image_url(article.top_img):
+            logger.info(f"   ✅ newspaper3k 提取到主图: {article.top_img}")
+            return [_create_image_dict(1, article.top_img)]
 
         logger.info("   ⚠️ newspaper3k 未找到有效图片，尝试下一个方法")
 
@@ -756,85 +887,258 @@ async def _extract_images(page, base_url: str) -> list[dict]:
     except Exception as e:
         logger.info(f"   ⚠️ newspaper3k 提取失败: {e}，尝试下一个方法")
 
-    # 方法2: 使用 trafilatura
+    return []
+
+
+def _extract_images_trafilatura(html: str, base_url: str) -> list[dict]:
+    """使用 trafilatura 提取正文图片"""
     try:
         import trafilatura
+        from bs4 import BeautifulSoup
 
-        # 使用 JSON 格式提取，包含图片信息
-        result = trafilatura.extract(
+        # 提取主要内容
+        extracted_html = trafilatura.extract(
             html,
-            url=base_url,
-            output_format="json",
-            include_images=True,
             include_comments=False,
-            with_metadata=False,
+            include_tables=True,
+            output_format="html",
+            no_fallback=False,
         )
 
-        if result:
-            import json
+        if not extracted_html:
+            logger.info("   ⚠️ trafilatura 未提取到正文内容")
+            return []
 
-            data = json.loads(result)
-            if "image" in data and data["image"]:
-                # 处理单个主图
-                image_url = data["image"]
-                logger.info(f"   ✅ trafilatura 提取到主图: {image_url}")
-                return [{"index": 1, "url": image_url, "alt": "", "width": 0, "height": 0}]
+        soup = BeautifulSoup(extracted_html, "html.parser")
+        img_tags = soup.find_all("img")
 
-        logger.info("   ⚠️ trafilatura 未找到图片，使用备用方案")
+        if not img_tags:
+            logger.info("   ⚠️ trafilatura 正文中未找到图片")
+            return []
 
+        valid_images = []
+        for img in img_tags:
+            src = img.get("src") or img.get("data-src")
+            if not src or not _is_valid_image_url(src):
+                continue
+
+            # 规范化URL
+            normalized_url = _normalize_image_url(src, base_url)
+            valid_images.append(normalized_url)
+
+        if valid_images:
+            logger.info(f"   ✅ trafilatura 正文中提取到 {len(valid_images)} 个图片")
+            return [_create_image_dict(i + 1, url) for i, url in enumerate(valid_images)]
+
+        logger.info("   ⚠️ trafilatura 未找到有效图片，使用备用方案")
+
+    except ImportError:
+        logger.info("   ⚠️ BeautifulSoup 或 trafilatura 未安装，使用备用方案")
     except Exception as e:
         logger.info(f"   ⚠️ trafilatura 图片提取失败: {e}，使用备用方案")
 
-    # 方法3: 使用 JavaScript 备用方案
-    return await _extract_images_fallback(page, base_url)
+    return []
 
 
 async def _extract_images_fallback(page, base_url: str) -> list[dict]:
-    """备用方案：使用 JavaScript 提取图片"""
+    """备用方案：使用 JavaScript 提取正文区域内的图片
+
+    优化策略：
+    1. 先定位正文区域容器
+    2. 只提取正文容器内的图片
+    3. 严格过滤无关图片（广告、图标、装饰等）
+    4. 检查图片与正文段落的位置关系
+    """
     try:
         images = await page.evaluate(
             """(baseUrl) => {
-            const images = [];
-            const imgElements = document.querySelectorAll('article img, .content img, .article-content img, main img, .news-content img, [class*="content"] img');
+            // ========== 1. 定位正文区域容器 ==========
+            const contentSelectors = [
+                'article',
+                '[role="article"]',
+                'article .article-content',
+                'article .content',
+                'article .post-content',
+                'article .entry-content',
+                'article .article-body',
+                'article .post-body',
+                'main .content',
+                'main .article-content',
+                'main .post-content',
+                'main .entry-content',
+                '.article-content',
+                '.post-content',
+                '.entry-content',
+                '.article-body',
+                '.post-body',
+                '.news-content',
+                '#article-content',
+                '#post-content',
+                '#content',
+            ];
 
-            imgElements.forEach((img, idx) => {
-                const src = img.src || img.getAttribute('data-src');
-                if (src && src.length > 10) {  // 过滤掉过短的URL
-                    // 处理相对路径
-                    let fullUrl = src;
-                    if (src.startsWith('//')) {
-                        fullUrl = 'https:' + src;
-                    } else if (src.startsWith('/')) {
-                        try {
-                            const urlObj = new URL(baseUrl);
-                            fullUrl = urlObj.origin + src;
-                        } catch (e) {
-                            fullUrl = src;
-                        }
-                    } else if (!src.startsWith('http')) {
-                        try {
-                            fullUrl = new URL(src, baseUrl).href;
-                        } catch (e) {
-                            fullUrl = src;
-                        }
-                    }
-
-                    // 过滤掉跟踪像素和小图标
-                    if (fullUrl.includes('.') &&
-                        !fullUrl.includes('pixel') &&
-                        !fullUrl.includes('tracking') &&
-                        !fullUrl.includes('icon') &&
-                        img.width > 50 && img.height > 50) {
-                        images.push({
-                            index: idx + 1,
-                            url: fullUrl,
-                            alt: img.alt || '',
-                            title: img.title || '',
-                            width: img.naturalWidth || img.width || 0,
-                            height: img.naturalHeight || img.height || 0
-                        });
+            let contentContainer = null;
+            for (const selector of contentSelectors) {
+                const elem = document.querySelector(selector);
+                if (elem) {
+                    // 检查容器是否包含足够的文本内容（至少200字）
+                    const textLength = elem.innerText?.length || 0;
+                    if (textLength >= 200) {
+                        contentContainer = elem;
+                        break;
                     }
                 }
+            }
+
+            // 如果没找到明确的正文容器，使用 body
+            if (!contentContainer) {
+                contentContainer = document.body;
+            }
+
+            // ========== 2. 只提取正文容器内的图片 ==========
+            const images = [];
+            const imgElements = contentContainer.querySelectorAll('img, picture img, figure img');
+
+            // ========== 3. 无关区域选择器（这些区域的图片要排除） ==========
+            const unwantedParentSelectors = [
+                'header', 'footer', 'nav', 'aside', '.sidebar',
+                '.header', '.footer', '.navigation', '.menu',
+                '.advertisement', '.ad', '.ad-banner', '.ad-container',
+                '.share', '.social', '.social-share', '.sharing',
+                '.comment', '.comments', '.related', '.recommended',
+                '.author-info', '.author-bio', '.sidebar-content',
+                '[class*="ad-"]', '[class*="advertisement"]',
+                '[id*="ad-"]', '[id*="advertisement"]',
+                '.widget', '.widgets', '.sidebar-widget',
+                '.newsletter', '.subscribe', '.subscription',
+                '.breadcrumb', '.breadcrumbs', '.pager', '.pagination',
+            ];
+
+            // ========== 4. 无关图片关键词（URL中包含这些关键词的排除） ==========
+            const unwantedKeywords = [
+                'icon', 'logo', 'avatar', 'pixel', 'tracking',
+                'ad', 'banner', 'sponsor', 'affiliate',
+                'share', 'social', 'facebook', 'twitter', 'weibo',
+                'wechat', 'qq', 'arrow', 'bullet', 'separator',
+                'divider', 'background', 'pattern', 'watermark',
+                'qr-code', 'qrcode', 'barcode', 'captcha',
+                'loading', 'spinner', 'placeholder', 'default',
+                'thumb', 'thumbnail', 'small', 'mini', 'tiny',
+            ];
+
+            imgElements.forEach((img, idx) => {
+                const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-original');
+
+                if (!src || src.length < 15) return;
+
+                // ========== 5. 检查图片是否在无关区域内 ==========
+                let parent = img.parentElement;
+                let inUnwantedArea = false;
+                let depth = 0;
+                while (parent && depth < 10) {
+                    const classList = parent.className || '';
+                    const id = parent.id || '';
+                    const tagName = parent.tagName?.toLowerCase() || '';
+
+                    for (const selector of unwantedParentSelectors) {
+                        // 检查标签名
+                        if (selector === tagName) {
+                            inUnwantedArea = true;
+                            break;
+                        }
+                        // 检查 class
+                        if (classList.includes(selector.replace('.', ''))) {
+                            inUnwantedArea = true;
+                            break;
+                        }
+                        // 检查 id
+                        if (id === selector.replace('#', '')) {
+                            inUnwantedArea = true;
+                            break;
+                        }
+                    }
+
+                    if (inUnwantedArea) break;
+                    parent = parent.parentElement;
+                    depth++;
+                }
+
+                if (inUnwantedArea) return;
+
+                // ========== 6. 检查 URL 是否包含无关关键词 ==========
+                const srcLower = src.toLowerCase();
+                const hasUnwantedKeyword = unwantedKeywords.some(kw => srcLower.includes(kw));
+                if (hasUnwantedKeyword) return;
+
+                // ========== 7. 处理相对路径 ==========
+                let fullUrl = src;
+                if (src.startsWith('//')) {
+                    fullUrl = 'https:' + src;
+                } else if (src.startsWith('/')) {
+                    try {
+                        const urlObj = new URL(baseUrl);
+                        fullUrl = urlObj.origin + src;
+                    } catch (e) {
+                        fullUrl = src;
+                    }
+                } else if (!src.startsWith('http')) {
+                    try {
+                        fullUrl = new URL(src, baseUrl).href;
+                    } catch (e) {
+                        fullUrl = src;
+                    }
+                }
+
+                // ========== 8. 检查图片尺寸（更严格） ==========
+                const width = img.naturalWidth || img.width || 0;
+                const height = img.naturalHeight || img.height || 0;
+
+                // 尺寸过滤：宽高都必须大于100px，且宽高比要合理（0.2-5.0之间）
+                if (width < 100 || height < 100) return;
+                const aspectRatio = width / height;
+                if (aspectRatio < 0.2 || aspectRatio > 5.0) return;
+
+                // ========== 9. 检查图片周围的文本（确保与正文相关） ==========
+                // 如果图片的父元素或相邻元素没有文本，可能是装饰性图片
+                let hasNearbyText = false;
+                let checkElem = img.parentElement;
+                let checks = 0;
+                while (checkElem && checks < 3) {
+                    const text = checkElem.innerText?.trim() || '';
+                    if (text.length >= 20) {
+                        hasNearbyText = true;
+                        break;
+                    }
+                    checkElem = checkElem.parentElement;
+                    checks++;
+                }
+
+                // 检查前后兄弟元素
+                if (!hasNearbyText) {
+                    const prev = img.previousElementSibling;
+                    const next = img.nextElementSibling;
+                    const prevText = prev?.innerText?.trim() || '';
+                    const nextText = next?.innerText?.trim() || '';
+                    if (prevText.length >= 20 || nextText.length >= 20) {
+                        hasNearbyText = true;
+                    }
+                }
+
+                if (!hasNearbyText) return;
+
+                // ========== 10. 检查图片格式（只保留常见格式） ==========
+                const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+                const hasValidExtension = validExtensions.some(ext => fullUrl.toLowerCase().includes(ext));
+                // 如果 URL 中没有文件扩展名，但图片通过了其他检查，也接受
+
+                images.push({
+                    index: images.length + 1,
+                    url: fullUrl,
+                    alt: img.alt || '',
+                    title: img.title || '',
+                    width: width,
+                    height: height
+                });
             });
 
             return images;
@@ -842,7 +1146,7 @@ async def _extract_images_fallback(page, base_url: str) -> list[dict]:
             base_url,
         )
 
-        logger.info(f"   🖼️ 备用方案找到 {len(images)} 个图片")
+        logger.info(f"   🖼️ 备用方案找到 {len(images)} 个正文图片")
         return images
 
     except Exception as e:

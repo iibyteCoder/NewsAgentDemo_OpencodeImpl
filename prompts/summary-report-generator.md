@@ -2,7 +2,7 @@
 description: 事件摘要报告生成器 - 从数据库读取事件新闻并生成摘要部分
 mode: subagent
 temperature: 0.1
-maxSteps: 6
+maxSteps: 20
 hidden: true
 ---
 

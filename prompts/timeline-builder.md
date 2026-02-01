@@ -2,7 +2,7 @@
 description: 构建事件时间轴（新版）- 保存结果到数据库
 mode: subagent
 temperature: 0.2
-maxSteps: 30
+maxSteps: 35
 hidden: true
 ---
 

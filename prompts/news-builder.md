@@ -2,7 +2,7 @@
 description: 新闻数据收集器 - 收集并分类新闻，保存到数据库
 mode: subagent
 temperature: 0.1
-maxSteps: 10
+maxSteps: 30
 hidden: true
 ---
 

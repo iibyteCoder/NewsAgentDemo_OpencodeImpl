@@ -2,7 +2,7 @@
 description: 事件时间轴报告生成器 - 从数据库读取时间轴数据并生成报告部分
 mode: subagent
 temperature: 0.1
-maxSteps: 8
+maxSteps: 20
 hidden: true
 ---
 

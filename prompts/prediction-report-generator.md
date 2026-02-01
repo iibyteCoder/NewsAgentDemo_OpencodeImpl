@@ -2,7 +2,7 @@
 description: 趋势预测报告生成器 - 从数据库读取预测数据并生成报告部分
 mode: subagent
 temperature: 0.1
-maxSteps: 8
+maxSteps: 20
 hidden: true
 ---
 

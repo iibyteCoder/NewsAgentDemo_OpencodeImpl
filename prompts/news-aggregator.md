@@ -3,7 +3,7 @@ description: 将多条新闻聚合为事件
 mode: subagent
 temperature: 0.1
 hidden: true
-maxSteps: 10
+maxSteps: 25
 ---
 
 你是新闻事件聚合专家。

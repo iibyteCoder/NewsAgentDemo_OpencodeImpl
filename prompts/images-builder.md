@@ -2,7 +2,7 @@
 description: 图片数据收集器 - 从数据库提取图片URL并下载到本地
 mode: subagent
 temperature: 0.1
-maxSteps: 10
+maxSteps: 40
 hidden: true
 ---
 

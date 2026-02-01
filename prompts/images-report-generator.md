@@ -2,7 +2,7 @@
 description: 相关图片报告生成器 - 从数据库读取图片元数据并生成报告部分
 mode: subagent
 temperature: 0.1
-maxSteps: 10
+maxSteps: 20
 hidden: true
 ---
 

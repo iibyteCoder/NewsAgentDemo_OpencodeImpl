@@ -2,7 +2,7 @@
 description: 摘要数据收集器 - 从数据库读取新闻并生成摘要
 mode: subagent
 temperature: 0.1
-maxSteps: 8
+maxSteps: 25
 hidden: true
 ---
 
