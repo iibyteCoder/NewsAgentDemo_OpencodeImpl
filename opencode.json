@@ -45,10 +45,10 @@
         }
       }
     },
-    "category-handler": {
+    "category-processor": {
       "mode": "subagent",
       "description": "新闻资讯收集智能体 - 单类别处理器",
-      "prompt": "{file:./prompts/category-handler.md}",
+      "prompt": "{file:./prompts/category-processor.md}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 30,
@@ -235,7 +235,7 @@
     "event-processor": {
       "mode": "subagent",
       "description": "事件处理器 - 并发处理单个事件的验证、时间轴、预测",
-      "prompt": "{file:./prompts/event-analyzer.md}",
+      "prompt": "{file:./prompts/event-processor.md}",
       "hidden": true,
       "temperature": 0.2,
       "maxSteps": 25,
@@ -250,24 +250,6 @@
       "permission": {
         "task": {
           "*": "allow"
-        }
-      }
-    },
-    "event-report-generator": {
-      "mode": "subagent",
-      "description": "事件报告生成器（新版）- 生成单个事件的 Markdown 报告文件",
-      "prompt": "{file:./prompts/report-generator.md}",
-      "hidden": true,
-      "temperature": 0.1,
-      "maxSteps": 20,
-      "tools": {
-        "write": true,
-        "bash": false,
-        "read": true
-      },
-      "permission": {
-        "task": {
-          "report-assembler": "allow"
         }
       }
     },

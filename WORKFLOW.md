@@ -39,7 +39,7 @@
          │           │           │
          ▼           ▼           ▼
     ┌────────┐  ┌────────┐  ┌────────┐
-    │ 体育   │  │ 政治   │  │ 科技   │  ← Category-Handler
+    │ 体育   │  │ 政治   │  │ 科技   │  ← Category-Processor
     └───┬────┘  └───┬────┘  └───┬────┘
         │           │           │
         ▼           ▼           ▼
@@ -109,9 +109,9 @@
 输入: "收集今日体育、政治、科技新闻"
 
 并行启动:
-├── Category-Handler (体育)
-├── Category-Handler (政治)
-└── Category-Handler (科技)
+├── Category-Processor (体育)
+├── Category-Processor (政治)
+└── Category-Processor (科技)
 
 所有任务同时执行，而非串行
 ```
@@ -123,9 +123,9 @@
 
 ---
 
-### 第二层：新闻级并行 (Category-Handler)
+### 第二层：新闻级并行 (Category-Processor)
 
-**位置**: `category-handler.md:105-120`
+**位置**: `category-processor.md:105-120`
 
 **职责**: 并行处理单个类别内的所有新闻链接
 
@@ -155,9 +155,9 @@
 
 ---
 
-### 第三层：事件级并行 (Category-Handler)
+### 第三层：事件级并行 (Category-Processor)
 
-**位置**: `category-handler.md:130-132`
+**位置**: `category-processor.md:130-132`
 
 **职责**: 并行处理单个类别内的所有事件
 
@@ -177,9 +177,9 @@
 
 ---
 
-### 第四层：事件处理三层架构 (Event-Analyzer)
+### 第四层：事件处理三层架构 (Event-Processor)
 
-**位置**: `event-analyzer.md:52-220`
+**位置**: `event-processor.md:52-220`
 
 **职责**: 使用三层架构处理单个事件，确保数据依赖正确
 
@@ -292,7 +292,7 @@
 
 3. **并行启动类别任务**
    ```text
-   为每个类别启动 @category-handler
+   为每个类别启动 @category-processor
    ├── 传递 session_id
    ├── 传递 report_timestamp
    └── 传递 category, specific_events
@@ -300,9 +300,9 @@
 
 ---
 
-### 阶段 1: 新闻收集 (Category-Handler)
+### 阶段 1: 新闻收集 (Category-Processor)
 
-**文件**: `category-handler.md`
+**文件**: `category-processor.md`
 
 #### 步骤 1.1: 搜索新闻
 
@@ -402,9 +402,9 @@
 
 ---
 
-### 阶段 2: 事件分析 (Event-Analyzer)
+### 阶段 2: 事件分析 (Event-Processor)
 
-**文件**: `event-analyzer.md`
+**文件**: `event-processor.md`
 
 #### 步骤 2.1: 读取事件新闻
 
@@ -742,7 +742,7 @@ CREATE TABLE report_sections (
     │
     ├─> Coordinator (生成 session_id, report_timestamp)
     │       │
-    │       └─> Category-Handler (接收参数)
+    │       └─> Category-Processor (接收参数)
     │               │
     │               ├─> 搜索新闻 (30-50条)
     │               │
@@ -922,7 +922,7 @@ CREATE TABLE report_sections (
 
 ### 3. 降级策略
 
-**示例**: Category-Handler
+**示例**: Category-Processor
 
 ```text
 步骤接近上限时的降级:

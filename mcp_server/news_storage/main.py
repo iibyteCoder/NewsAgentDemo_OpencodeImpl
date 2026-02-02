@@ -537,7 +537,7 @@ async def get_report_sections_summary(session_id: str, event_name: str) -> str:
     - 用于检查哪些部分已完成
 
     【使用场景】
-    - event-analyzer 检查各部分完成状态
+    - event-processor 检查各部分完成状态
     - report-assembler 确定哪些部分需要生成
 
     Args:

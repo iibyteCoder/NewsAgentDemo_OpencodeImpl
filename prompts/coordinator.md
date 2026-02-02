@@ -65,7 +65,7 @@ echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
 
 ### 3. 并行启动类别任务
 
-为每个类别启动 `@category-handler` 任务，必须传递：
+为每个类别启动 `@category-processor` 任务，必须传递：
 
 - session_id
 - report_timestamp
