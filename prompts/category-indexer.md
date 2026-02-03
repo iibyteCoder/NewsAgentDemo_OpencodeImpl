@@ -71,7 +71,7 @@ hidden: true
 
 #### 2.2 日期级索引
 
-**文件路径**：`output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/index.md`
+**文件路径**：`output/{report_timestamp}/{category}新闻/{date}/index.md`
 
 **引用模板**：使用 `Read` 工具读取 `@templates/date-index-template.md`
 
@@ -79,22 +79,24 @@ hidden: true
 
 - 列出该日期下的所有事件
 - 提供返回类别索引和总索引的导航链接
-- 链接到各个事件索引或事件报告
+- 链接到事件汇总索引（资讯汇总与摘要/index.md）
 
-#### 2.3 事件级索引
+**关键要求**：每个日期目录必须有且仅有一个 index.md 文件！
 
-**文件路径**：`output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/{事件名称}_index.md`
+#### 2.3 事件汇总级索引
+
+**文件路径**：`output/{report_timestamp}/{category}新闻/{date}/资讯汇总与摘要/index.md`
 
 **引用模板**：使用 `Read` 工具读取 `@templates/event-index-template.md`
 
 **功能**：
 
-- 为单个事件提供详细导航
+- 为该目录下的所有事件提供导航
 - 列出相关新闻
 - 提供返回上级索引的导航链接
-- 链接到事件详情报告
+- 链接到各个事件详情报告（.md 文件）
 
-**注意**：事件级索引是必须生成的，为每个事件都要创建对应的索引文件。
+**注意**：事件汇总索引是该目录唯一的 index.md，不要为每个事件创建单独的 _index.md 文件。
 
 ### 步骤 3：填充模板
 
@@ -154,7 +156,7 @@ Read("templates/event-index-template.md")       # 读取事件索引模板
 
 - **类别索引**：返回总索引（链接目标：`../index.md`）
 - **日期索引**：返回类别索引（链接目标：`../../index.md`）、返回总索引（链接目标：`../../../index.md`）
-- **事件索引**：返回日期索引（链接目标：`../index.md`）、返回类别索引（链接目标：`../../index.md`）、返回总索引（链接目标：`../../../index.md`）
+- **事件汇总索引**：返回日期索引（链接目标：`../index.md`）、返回类别索引（链接目标：`../../index.md`）、返回总索引（链接目标：`../../../index.md`）
 
 ## 输出要求
 
@@ -166,12 +168,8 @@ Read("templates/event-index-template.md")       # 读取事件索引模板
   "date": "2026-01-30",
   "event_count": 10,
   "category_index_path": "output/report_20260130_153000/体育新闻/index.md",
-  "date_index_path": "output/report_20260130_153000/体育新闻/2026-01-30/资讯汇总与摘要/index.md",
-  "event_indexes_count": 10,
-  "event_indexes_paths": [
-    "output/report_20260130_153000/体育新闻/2026-01-30/资讯汇总与摘要/事件1_index.md",
-    "output/report_20260130_153000/体育新闻/2026-01-30/资讯汇总与摘要/事件2_index.md"
-  ],
+  "date_index_path": "output/report_20260130_153000/体育新闻/2026-01-30/index.md",
+  "event_summary_index_path": "output/report_20260130_153000/体育新闻/2026-01-30/资讯汇总与摘要/index.md",
   "status": "completed"
 }
 ```
@@ -185,12 +183,13 @@ Read("templates/event-index-template.md")       # 读取事件索引模板
 
 ## 关键原则
 
-1. ⭐⭐⭐ **三级索引必须全部生成** - 类别级、日期级、事件级索引都是必须的，不能遗漏
-2. ⭐⭐⭐ **session_id 管理** - 从 prompt 参数获取，禁止自己生成
-3. ⭐⭐ **相对路径链接** - 所有链接使用相对路径，便于目录迁移
-4. ⭐⭐ **基于真实文件** - 扫描实际存在的文件，不要编造事件列表
-5. ⭐ **严格遵循模板** - 必须先使用 `Read` 工具读取模板文件，然后严格遵守其格式和占位符
-6. ⭐ **只生成索引** - 不生成事件报告本身
+1. ⭐⭐⭐ **三级索引必须全部生成** - 类别级、日期级、事件汇总级索引都是必须的，不能遗漏
+2. ⭐⭐⭐ **每个文件夹只有一个 index.md** - 严格遵守每个目录一个 index.md 的原则
+3. ⭐⭐⭐ **session_id 管理** - 从 prompt 参数获取，禁止自己生成
+4. ⭐⭐ **相对路径链接** - 所有链接使用相对路径，便于目录迁移
+5. ⭐⭐ **基于真实文件** - 扫描实际存在的文件，不要编造事件列表
+6. ⭐ **严格遵循模板** - 必须先使用 `Read` 工具读取模板文件，然后严格遵守其格式和占位符
+7. ⭐ **只生成索引** - 不生成事件报告本身，不为每个事件创建单独的 _index.md 文件
 
 ## 错误处理
 

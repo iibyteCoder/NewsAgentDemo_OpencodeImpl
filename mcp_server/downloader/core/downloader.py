@@ -1,7 +1,6 @@
 """核心下载器"""
 
 import asyncio
-import re
 from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
@@ -53,7 +52,9 @@ class Downloader:
         if not path.exists():
             # Path.mkdir() 是同步操作，但很快，在线程池中执行
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, lambda: path.mkdir(parents=True, exist_ok=True))
+            await loop.run_in_executor(
+                None, lambda: path.mkdir(parents=True, exist_ok=True)
+            )
 
     async def download(
         self,

@@ -24,7 +24,9 @@ class SinaEngine(BaseEngine):
         """新浪需要保留样式表"""
         return ["image", "media"]
 
-    def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
+    def get_search_url(
+        self, query: str, num_results: int = 30, search_type: str = "web"
+    ) -> str:
         """构建搜索URL"""
         encoded_query = quote(query)
         # 新浪搜索使用 q 参数，并添加 c=news 指定新闻搜索
@@ -51,7 +53,8 @@ class SinaEngine(BaseEngine):
             logger.warning("   ⚠️ 新浪新闻页面加载超时，但继续尝试解析")
 
         # 解析结果
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const newsItems = document.querySelectorAll('div.box-result');
 
@@ -95,7 +98,8 @@ class SinaEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

@@ -11,8 +11,8 @@ Downloader MCP Server - 文件下载器
 
 from typing import Optional
 
-from mcp.server.fastmcp import FastMCP
 from loguru import logger
+from mcp.server.fastmcp import FastMCP
 
 from .core.config import get_settings
 from .tools.download_tools import (
@@ -24,12 +24,21 @@ from .tools.download_tools import (
 
 # 初始化配置
 settings = get_settings()
-logger.info(f"🚀 Downloader MCP Server 启动")
+logger.info("🚀 Downloader MCP Server 启动")
 logger.info(f"   默认下载目录: {settings.default_download_dir.absolute()}")
 logger.info(f"   最大并发下载数: {settings.max_concurrent_downloads}")
 
 # 创建 FastMCP 服务器
-server = FastMCP("downloader")
+server = FastMCP(
+    name="downloader",
+    # 可用性配置
+    retry_interval=5,  # 连接重试间隔（秒）
+    stateless_http=True,  # 无状态 HTTP 模式（提高可扩展性）
+    json_response=True,  # 使用 JSON 响应格式
+    # 监控配置
+    log_level="INFO",
+    debug=False,
+)
 
 
 # ========== 注册工具函数 ==========
@@ -91,7 +100,9 @@ async def download_images_from_html_tool(
     Returns:
         JSON格式：{total, success, failed, results[{url, success, filepath, message}]}
     """
-    return await download_images_from_html(html_content, base_url, save_path, max_concurrent)
+    return await download_images_from_html(
+        html_content, base_url, save_path, max_concurrent
+    )
 
 
 @server.tool(name="downloader_download_images_from_url")

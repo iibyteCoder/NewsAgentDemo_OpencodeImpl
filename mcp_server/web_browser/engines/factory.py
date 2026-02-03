@@ -6,18 +6,18 @@ from typing import Dict, List, Optional
 
 from loguru import logger
 
-from .base import BaseEngine
 from .baidu import BaiduEngine
+from .base import BaseEngine
 from .bing import BingEngine
-from .sogou import SogouEngine
-from .google import GoogleEngine
 from .engine_360 import Engine360
-from .toutiao import ToutiaoEngine
-from .tencent import TencentEngine
-from .wangyi import WangyiEngine
-from .sina import SinaEngine
-from .sohu import SohuEngine
+from .google import GoogleEngine
 from .serper import SerperEngine
+from .sina import SinaEngine
+from .sogou import SogouEngine
+from .sohu import SohuEngine
+from .tencent import TencentEngine
+from .toutiao import ToutiaoEngine
+from .wangyi import WangyiEngine
 
 
 class EngineFactory:
@@ -131,20 +131,19 @@ class EngineFactory:
         """
         # 获取当前禁用次数
         if engine_id in self._banned_engines:
-            ban_count = self._banned_engines[engine_id].get('ban_count', 0) + 1
+            ban_count = self._banned_engines[engine_id].get("ban_count", 0) + 1
         else:
             ban_count = 1
 
         # 计算禁用时长（指数增长，最大30分钟）
         ban_duration = min(
-            self.BAN_DURATION_BASE * (2 ** (ban_count - 1)),
-            self.BAN_DURATION_MAX
+            self.BAN_DURATION_BASE * (2 ** (ban_count - 1)), self.BAN_DURATION_MAX
         )
 
         unban_time = time.time() + ban_duration
         self._banned_engines[engine_id] = {
-            'unban_time': unban_time,
-            'ban_count': ban_count
+            "unban_time": unban_time,
+            "ban_count": ban_count,
         }
         logger.warning(
             f"🚫 禁用引擎 {engine_id}: {reason} "
@@ -164,7 +163,7 @@ class EngineFactory:
             return False
 
         ban_info = self._banned_engines[engine_id]
-        unban_time = ban_info['unban_time']
+        unban_time = ban_info["unban_time"]
 
         # 检查是否已到解禁时间
         if time.time() >= unban_time:
@@ -187,7 +186,9 @@ class EngineFactory:
 
         # 浏览器引擎（检查是否被禁用）
         for engine_id in self.enabled_engines:
-            if engine_id in self._ENGINE_CLASSES and not self.is_engine_banned(engine_id):
+            if engine_id in self._ENGINE_CLASSES and not self.is_engine_banned(
+                engine_id
+            ):
                 available_engines.append(engine_id)
 
         if not available_engines:
@@ -201,7 +202,9 @@ class EngineFactory:
         """按速度优先级获取启用的引擎列表（跳过被禁用的）"""
         engines = []
         for engine_id in self._SPEED_PRIORITY:
-            if engine_id in self.enabled_engines and not self.is_engine_banned(engine_id):
+            if engine_id in self.enabled_engines and not self.is_engine_banned(
+                engine_id
+            ):
                 engine = self.get_engine(engine_id)
                 if engine:
                     engines.append(engine)

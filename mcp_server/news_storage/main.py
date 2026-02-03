@@ -6,38 +6,40 @@ News Storage MCP Server - 新闻存储管理器
 
 from typing import Optional
 
-from mcp.server.fastmcp import FastMCP
 from loguru import logger
+from mcp.server.fastmcp import FastMCP
 
-from .tools.storage_tools import (
+from news_storage import ReportSectionRepository
+from news_storage.tools import (
     batch_update_event_name_tool,
-    delete_news_tool,
+    get_all_report_sections_tool,
+    get_images_by_event_tool,
     get_news_by_url_tool,
     get_news_stats_tool,
-    get_recent_news_tool,
+    get_report_section_tool,
+    get_report_sections_summary_tool,
+    list_categories_tool,
+    list_events_by_category_tool,
+    list_news_by_event_tool,
     save_news_batch_tool,
     save_news_tool,
+    save_report_section_tool,
     search_news_tool,
     update_event_name_tool,
     update_news_content_tool,
 )
-from .tools.navigation_tools import (
-    list_categories_tool,
-    list_events_by_category_tool,
-    list_news_by_event_tool,
-    get_images_by_event_tool,
-)
-from .tools.report_sections_tools import (
-    save_report_section_tool,
-    get_report_section_tool,
-    get_all_report_sections_tool,
-    get_report_sections_summary_tool,
-    mark_section_failed_tool,
-)
-from .core import report_sections_model
 
 # 初始化服务器
-server = FastMCP("news_storage")
+server = FastMCP(
+    name="news_storage",
+    # 可用性配置
+    retry_interval=5,  # 连接重试间隔（秒）
+    stateless_http=True,  # 无状态 HTTP 模式（提高可扩展性）
+    json_response=True,  # 使用 JSON 响应格式
+    # 监控配置
+    log_level="INFO",
+    debug=False,
+)
 
 logger.info("🚀 News Storage MCP Server 启动")
 logger.info("   数据库: ./data/news_storage.db")
@@ -247,9 +249,7 @@ async def save_news_batch(news_list: str) -> str:
 
 
 @server.tool(name="news-storage_get_by_url")
-async def get_news_by_url(
-    url: str, session_id: str = "", category: str = ""
-) -> str:
+async def get_news_by_url(url: str, session_id: str = "", category: str = "") -> str:
     """根据URL获取新闻
 
     Args:
@@ -260,9 +260,7 @@ async def get_news_by_url(
     Returns:
         JSON格式的新闻数据，不存在返回null
     """
-    return await get_news_by_url_tool(
-        url=url, session_id=session_id, category=category
-    )
+    return await get_news_by_url_tool(url=url, session_id=session_id, category=category)
 
 
 @server.tool(name="news-storage_search")
@@ -309,25 +307,6 @@ async def search_news(
     )
 
 
-@server.tool(name="news-storage_get_recent")
-async def get_recent_news(
-    session_id: str, limit: int = 100, offset: int = 0
-) -> str:
-    """获取最近添加的新闻（按添加时间倒序）
-
-    Args:
-        session_id: 会话ID（必填）
-        limit: 返回数量
-        offset: 偏移量
-
-    Returns:
-        JSON格式的新闻列表
-    """
-    return await get_recent_news_tool(
-        session_id=session_id, limit=limit, offset=offset
-    )
-
-
 @server.tool(name="news-storage_update_content")
 async def update_news_content(url: str, content: str, html_content: str = "") -> str:
     """更新新闻内容
@@ -343,19 +322,6 @@ async def update_news_content(url: str, content: str, html_content: str = "") ->
     return await update_news_content_tool(
         url=url, content=content, html_content=html_content
     )
-
-
-@server.tool(name="news-storage_delete")
-async def delete_news(url: str) -> str:
-    """删除新闻
-
-    Args:
-        url: 新闻URL
-
-    Returns:
-        JSON格式的操作结果
-    """
-    return await delete_news_tool(url=url)
 
 
 @server.tool(name="news-storage_stats")
@@ -559,48 +525,6 @@ async def get_report_sections_summary(session_id: str, event_name: str) -> str:
     )
 
 
-@server.tool(name="news-storage_mark_section_failed")
-async def mark_section_failed(
-    session_id: str, event_name: str, section_type: str, error_message: str
-) -> str:
-    """标记报告部分失败 - ❌ 记录错误
-
-    【核心功能】
-    - 标记某个部分生成失败
-    - 记录错误信息
-    - 用于后续错误处理
-
-    【使用场景】
-    - validator 验证失败时记录错误
-    - timeline-builder 构建失败时记录错误
-    - predictor 预测失败时记录错误
-
-    Args:
-        session_id: 会话ID
-        event_name: 事件名称
-        section_type: 部分类型
-        error_message: 错误信息
-
-    Returns:
-        JSON格式：{success, message, section_type}
-
-    Examples:
-        >>> # 标记验证失败
-        >>> mark_section_failed(
-        ...     session_id="20260130-abc123",
-        ...     event_name="美国大选",
-        ...     section_type="validation",
-        ...     error_message="无法获取足够的验证信息"
-        ... )
-    """
-    return await mark_section_failed_tool(
-        session_id=session_id,
-        event_name=event_name,
-        section_type=section_type,
-        error_message=error_message,
-    )
-
-
 @server.tool(name="news-storage_list_section_types")
 async def list_section_types() -> str:
     """列出所有报告部分类型 - 📋 类型参考
@@ -623,7 +547,8 @@ async def list_section_types() -> str:
         >>> list_section_types()
     """
     import json
-    section_types = report_sections_model.get_all_section_types()
+
+    section_types = ReportSectionRepository.get_all_section_types()
     return json.dumps(
         {
             "success": True,

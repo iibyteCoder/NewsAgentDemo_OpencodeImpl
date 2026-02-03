@@ -11,11 +11,9 @@ from playwright.async_api import Page
 from ..config.settings import get_settings
 from ..core.browser_pool import get_browser_pool
 from ..core.rate_limiter import RateLimiter
-from ..engines.base import SearchResult
 from ..engines.factory import EngineFactory
 from ..engines.serper import SerperEngine
 from ..utils.helpers import get_random_user_agent, search_result_to_dict
-
 
 # ========== 常量定义 ==========
 # 图片过滤相关常量
@@ -25,57 +23,112 @@ MIN_IMAGE_SIZE = 100
 
 # 无关图片关键词（用于URL过滤）
 UNWANTED_IMAGE_KEYWORDS = [
-    "icon", "logo", "pixel", "tracking", "avatar",
-    "ad", "banner", "sponsor", "affiliate",
-    "share", "social", "facebook", "twitter", "weibo",
-    "wechat", "qq", "arrow", "bullet", "separator",
-    "divider", "background", "pattern", "watermark",
-    "qr-code", "qrcode", "barcode", "captcha",
-    "loading", "spinner", "placeholder", "default",
-    "thumb", "thumbnail", "small", "mini", "tiny",
+    "icon",
+    "logo",
+    "pixel",
+    "tracking",
+    "avatar",
+    "ad",
+    "banner",
+    "sponsor",
+    "affiliate",
+    "share",
+    "social",
+    "facebook",
+    "twitter",
+    "weibo",
+    "wechat",
+    "qq",
+    "arrow",
+    "bullet",
+    "separator",
+    "divider",
+    "background",
+    "pattern",
+    "watermark",
+    "qr-code",
+    "qrcode",
+    "barcode",
+    "captcha",
+    "loading",
+    "spinner",
+    "placeholder",
+    "default",
+    "thumb",
+    "thumbnail",
+    "small",
+    "mini",
+    "tiny",
 ]
 
 # 有效图片扩展名
-VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
+VALID_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]
 
 # 无关区域选择器
 UNWANTED_PARENT_SELECTORS = [
-    'header', 'footer', 'nav', 'aside', '.sidebar',
-    '.header', '.footer', '.navigation', '.menu',
-    '.advertisement', '.ad', '.ad-banner', '.ad-container',
-    '.share', '.social', '.social-share', '.sharing',
-    '.comment', '.comments', '.related', '.recommended',
-    '.author-info', '.author-bio', '.sidebar-content',
-    '[class*="ad-"]', '[class*="advertisement"]',
-    '[id*="ad-"]', '[id*="advertisement"]',
-    '.widget', '.widgets', '.sidebar-widget',
-    '.newsletter', '.subscribe', '.subscription',
-    '.breadcrumb', '.breadcrumbs', '.pager', '.pagination',
+    "header",
+    "footer",
+    "nav",
+    "aside",
+    ".sidebar",
+    ".header",
+    ".footer",
+    ".navigation",
+    ".menu",
+    ".advertisement",
+    ".ad",
+    ".ad-banner",
+    ".ad-container",
+    ".share",
+    ".social",
+    ".social-share",
+    ".sharing",
+    ".comment",
+    ".comments",
+    ".related",
+    ".recommended",
+    ".author-info",
+    ".author-bio",
+    ".sidebar-content",
+    '[class*="ad-"]',
+    '[class*="advertisement"]',
+    '[id*="ad-"]',
+    '[id*="advertisement"]',
+    ".widget",
+    ".widgets",
+    ".sidebar-widget",
+    ".newsletter",
+    ".subscribe",
+    ".subscription",
+    ".breadcrumb",
+    ".breadcrumbs",
+    ".pager",
+    ".pagination",
 ]
 
 # 正文区域选择器
 CONTENT_SELECTORS = [
-    'article',
+    "article",
     '[role="article"]',
-    'article .article-content',
-    'article .content',
-    'article .post-content',
-    'article .entry-content',
-    'article .article-body',
-    'article .post-body',
-    'main .content',
-    'main .article-content',
-    'main .post-content',
-    'main .entry-content',
-    '.article-content',
-    '.post-content',
-    '.entry-content',
-    '.article-body',
-    '.post-body',
-    '.news-content',
-    '#article-content',
-    '#post-content',
-    '#content',
+    "article .article-content",
+    "article .content",
+    "article .post-content",
+    "article .entry-content",
+    "article .article-body",
+    "article .post-body",
+    "main .content",
+    "main .article-content",
+    "main .post-content",
+    "main .entry-content",
+    ".article-content",
+    ".post-content",
+    ".entry-content",
+    ".article-body",
+    ".post-body",
+    ".news-content",
+    "#article-content",
+    "#post-content",
+    "#content",
 ]
 
 
@@ -140,7 +193,9 @@ def _normalize_image_url(url: str, base_url: str) -> str:
     return url
 
 
-def _create_image_dict(index: int, url: str, alt: str = "", width: int = 0, height: int = 0) -> dict:
+def _create_image_dict(
+    index: int, url: str, alt: str = "", width: int = 0, height: int = 0
+) -> dict:
     """创建图片信息字典
 
     Args:
@@ -174,17 +229,39 @@ async def _check_anti_bot(page: Page, url: str) -> tuple[bool, str]:
     """
     try:
         # 1. 检查HTTP状态
-        response = await page.evaluate("() => ({ status: window.performance?.getEntriesByType?.('navigation')?.[0]?.responseStatus || 200 })")
+        response = await page.evaluate(
+            "() => ({ status: window.performance?.getEntriesByType?.('navigation')?.[0]?.responseStatus || 200 })"
+        )
         if response and response.get("status", 200) >= 400:
             return True, f"HTTP错误: {response['status']}"
 
         # 2. 检查页面标题
         page_title = await page.title()
         anti_bot_keywords = [
-            "验证", "安全", "captcha", "人机验证", "机器人", "robot", "验证码",
-            "滑动验证", "点选验证", "短信验证", "阿里云", "云盾", "腾讯云", "天御",
-            "访问频繁", "请求过于频繁", "操作过于频繁", "系统检测", "异常访问",
-            "风险检测", "安全检测", "cc攻击", "防刷", "反爬"
+            "验证",
+            "安全",
+            "captcha",
+            "人机验证",
+            "机器人",
+            "robot",
+            "验证码",
+            "滑动验证",
+            "点选验证",
+            "短信验证",
+            "阿里云",
+            "云盾",
+            "腾讯云",
+            "天御",
+            "访问频繁",
+            "请求过于频繁",
+            "操作过于频繁",
+            "系统检测",
+            "异常访问",
+            "风险检测",
+            "安全检测",
+            "cc攻击",
+            "防刷",
+            "反爬",
         ]
 
         page_title_lower = page_title.lower()
@@ -193,11 +270,24 @@ async def _check_anti_bot(page: Page, url: str) -> tuple[bool, str]:
                 return True, f"页面标题包含反爬虫关键词: {keyword}"
 
         # 3. 检查页面内容
-        body_text = await page.evaluate("() => document.body.innerText?.substring(0, 500) || ''")
+        body_text = await page.evaluate(
+            "() => document.body.innerText?.substring(0, 500) || ''"
+        )
         anti_bot_phrases = [
-            '访问过于频繁', '请求过于频繁', '操作过于频繁', '系统检测到异常访问',
-            '疑似机器人', '人机验证', '安全验证', '请完成验证', 'ip被封', '禁止访问',
-            'access denied', 'forbidden', 'rate limit', 'too many requests'
+            "访问过于频繁",
+            "请求过于频繁",
+            "操作过于频繁",
+            "系统检测到异常访问",
+            "疑似机器人",
+            "人机验证",
+            "安全验证",
+            "请完成验证",
+            "ip被封",
+            "禁止访问",
+            "access denied",
+            "forbidden",
+            "rate limit",
+            "too many requests",
         ]
 
         for phrase in anti_bot_phrases:
@@ -205,7 +295,8 @@ async def _check_anti_bot(page: Page, url: str) -> tuple[bool, str]:
                 return True, f"页面内容包含反爬虫提示: {phrase}"
 
         # 4. 检查验证码元素
-        captcha_elements = await page.evaluate("""() => {
+        captcha_elements = await page.evaluate(
+            """() => {
             const selectors = ['#captcha', '.captcha', '[class*="captcha"]', '#geetest',
                              '[class*="geetest"]', '.recaptcha', '[class*="recaptcha"]',
                              '.verify', '[class*="verify"]'];
@@ -215,7 +306,8 @@ async def _check_anti_bot(page: Page, url: str) -> tuple[bool, str]:
                 }
             }
             return false;
-        }""")
+        }"""
+        )
 
         if captcha_elements:
             return True, "检测到验证码元素"
@@ -295,7 +387,7 @@ async def _execute_search(
         user_agent = get_random_user_agent()
         async with _browser_pool.get_page(user_agent=user_agent, engine=engine) as page:
             # 先访问页面
-            await page.goto(search_url, timeout=30000)
+            await page.goto(search_url, timeout=_settings.page_load_timeout)
 
             # 检测反爬虫拦截
             is_blocked, block_reason = await _check_anti_bot(page, search_url)
@@ -427,7 +519,9 @@ async def _multi_search_with_fallback(
 
             # 如果有结果，返回
             if result_data.get("total", 0) > 0:
-                logger.info(f"   ✅ {engine.config.name} 成功返回 {result_data['total']} 条结果")
+                logger.info(
+                    f"   ✅ {engine.config.name} 成功返回 {result_data['total']} 条结果"
+                )
                 # 添加引擎状态信息
                 result_data["available_engines"] = available_count
                 result_data["banned_engines"] = banned_count
@@ -594,7 +688,7 @@ async def fetch_article_content(url: str, include_images: bool = True) -> str:
     try:
         user_agent = get_random_user_agent()
         async with _browser_pool.get_page(user_agent=user_agent) as page:
-            response = await page.goto(url, timeout=30000)
+            response = await page.goto(url, timeout=_settings.page_navigation_timeout)
 
             # 始终检查页面状态
             status = await _check_page_status(page, response, url)
@@ -870,8 +964,12 @@ def _extract_images_newspaper3k(html: str, base_url: str) -> list[dict]:
             valid_images = [url for url in article.images if _is_valid_image_url(url)]
 
             if valid_images:
-                logger.info(f"   ✅ newspaper3k 提取到 {len(valid_images)} 个有效图片 (原始{len(article.images)}个)")
-                return [_create_image_dict(i + 1, url) for i, url in enumerate(valid_images)]
+                logger.info(
+                    f"   ✅ newspaper3k 提取到 {len(valid_images)} 个有效图片 (原始{len(article.images)}个)"
+                )
+                return [
+                    _create_image_dict(i + 1, url) for i, url in enumerate(valid_images)
+                ]
             else:
                 logger.info("   ⚠️ newspaper3k 提取的图片都被过滤掉了")
 
@@ -928,7 +1026,9 @@ def _extract_images_trafilatura(html: str, base_url: str) -> list[dict]:
 
         if valid_images:
             logger.info(f"   ✅ trafilatura 正文中提取到 {len(valid_images)} 个图片")
-            return [_create_image_dict(i + 1, url) for i, url in enumerate(valid_images)]
+            return [
+                _create_image_dict(i + 1, url) for i, url in enumerate(valid_images)
+            ]
 
         logger.info("   ⚠️ trafilatura 未找到有效图片，使用备用方案")
 
@@ -1183,11 +1283,23 @@ async def _check_page_status(page, response, url: str) -> dict:
                 status_info["checks"].append(f"HTTP状态码异常: {status_code}")
 
                 if status_code == 404:
-                    status_info["suggestions"] = ["页面不存在", "检查URL是否正确", "尝试搜索相关内容"]
+                    status_info["suggestions"] = [
+                        "页面不存在",
+                        "检查URL是否正确",
+                        "尝试搜索相关内容",
+                    ]
                 elif status_code == 403:
-                    status_info["suggestions"] = ["访问被拒绝", "可能需要登录", "尝试使用其他网站"]
+                    status_info["suggestions"] = [
+                        "访问被拒绝",
+                        "可能需要登录",
+                        "尝试使用其他网站",
+                    ]
                 elif status_code >= 500:
-                    status_info["suggestions"] = ["服务器错误", "稍后重试", "尝试使用镜像网站"]
+                    status_info["suggestions"] = [
+                        "服务器错误",
+                        "稍后重试",
+                        "尝试使用镜像网站",
+                    ]
 
                 return status_info
 
@@ -1246,7 +1358,14 @@ async def _check_page_status(page, response, url: str) -> dict:
                 return status_info
 
         # 检查是否是错误页面
-        error_keywords = ["404", "不存在", "无法访问", "not found", "页面不存在", "访问失败"]
+        error_keywords = [
+            "404",
+            "不存在",
+            "无法访问",
+            "not found",
+            "页面不存在",
+            "访问失败",
+        ]
         if any(keyword in page_title for keyword in error_keywords):
             status_info["status"] = "error"
             status_info["reason"] = "页面不存在或无法访问"
@@ -1385,7 +1504,9 @@ async def _check_page_status(page, response, url: str) -> dict:
             status_info["reason"] = "被反爬虫拦截: 检测到验证码"
             status_info["anti_bot_detected"] = True
             status_info["anti_bot_type"] = "captcha_element"
-            status_info["checks"].append(f"检测到验证码元素: {page_check.get('captchaElements', [])}")
+            status_info["checks"].append(
+                f"检测到验证码元素: {page_check.get('captchaElements', [])}"
+            )
             status_info["suggestions"] = [
                 "❌ 被反爬虫验证码拦截",
                 "🚫 需要人工验证，浏览器已无法使用",
@@ -1394,7 +1515,9 @@ async def _check_page_status(page, response, url: str) -> dict:
                 "🔍 尝试使用其他搜索引擎",
                 "📱 尝试使用移动端网站",
             ]
-            logger.warning(f"🚨 检测到反爬虫拦截（验证码）: {page_check.get('captchaElements', [])}")
+            logger.warning(
+                f"🚨 检测到反爬虫拦截（验证码）: {page_check.get('captchaElements', [])}"
+            )
             return status_info
 
         # 检查反爬虫提示文本
@@ -1460,7 +1583,9 @@ async def _check_page_status(page, response, url: str) -> dict:
         if page_check.get("isEmpty"):
             status_info["status"] = "warning"
             status_info["reason"] = "页面内容过少"
-            status_info["checks"].append(f"页面文本长度: {page_check.get('textLength', 0)}")
+            status_info["checks"].append(
+                f"页面文本长度: {page_check.get('textLength', 0)}"
+            )
             status_info["suggestions"] = [
                 "页面内容过少",
                 "可能是加载中或内容被限制",
@@ -1659,68 +1784,6 @@ def _get_suggestions(status: dict) -> list[str]:
     return suggestions
 
 
-async def baidu_hot_search() -> str:
-    """获取百度热搜榜"""
-    logger.info("🔥 [百度热搜榜] 获取热搜榜单")
-
-    await _rate_limiter.acquire()
-
-    try:
-        hot_url = "https://top.baidu.com/board?tab=realtime"
-
-        user_agent = get_random_user_agent()
-        async with _browser_pool.get_page(user_agent=user_agent) as page:
-            await page.goto(hot_url, timeout=30000)
-
-            hot_items = await page.evaluate(
-                """() => {
-                const items = [];
-                const elements = document.querySelectorAll('.category-wrap_iQLoo.horizontal_1eKyQ');
-
-                elements.forEach((item, idx) => {
-                    try {
-                        const titleElem = item.querySelector('.c-single-text-ellipsis');
-                        const title = titleElem ? titleElem.innerText?.trim() || '' : '';
-
-                        const hotScoreElem = item.querySelector('.hot-index_1Bl1a');
-                        const hotScore = hotScoreElem ? hotScoreElem.innerText?.trim() || '' : '';
-
-                        const linkElem = item.querySelector('a');
-                        const url = linkElem ? linkElem.getAttribute('href') || '' : '';
-
-                        if (title) {
-                            items.push({
-                                rank: idx + 1,
-                                title,
-                                hot_score: hotScore,
-                                url
-                            });
-                        }
-                    } catch (e) {
-                        // 忽略单个条目的解析错误
-                    }
-                });
-
-                return items;
-            }"""
-            )
-
-        logger.info(f"✅ 热搜榜获取完成: {len(hot_items)} 条")
-
-        return json.dumps(
-            {"total": len(hot_items), "hot_items": hot_items},
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    except Exception as e:
-        logger.error(f"❌ 获取百度热搜失败: {e}")
-        return json.dumps(
-            {"total": 0, "hot_items": [], "error": str(e)},
-            ensure_ascii=False,
-        )
-
-
 # ========== Serper 搜索函数 ==========
 
 
@@ -1749,4 +1812,3 @@ async def serper_news_search(query: str, num_results: int = 30) -> str:
         Serper.dev 使用 API 调用，不需要浏览器
     """
     return await _execute_search("serper", query, num_results, "news")
-

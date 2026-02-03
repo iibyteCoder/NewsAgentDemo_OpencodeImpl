@@ -50,7 +50,8 @@ class BaiduEngine(BaseEngine):
 
     async def _parse_web_results(self, page: Page) -> List[SearchResult]:
         """解析网页搜索结果"""
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const contentLeft = document.querySelector('#content_left');
             if (!contentLeft) return results;
@@ -111,7 +112,8 @@ class BaiduEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]
@@ -120,7 +122,8 @@ class BaiduEngine(BaseEngine):
 
     async def _parse_news_results(self, page: Page) -> List[SearchResult]:
         """解析新闻搜索结果"""
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const newsItems = document.querySelectorAll('div[tpl="news-normal"]');
 
@@ -157,7 +160,8 @@ class BaiduEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

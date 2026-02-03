@@ -38,6 +38,7 @@ class RateLimiter:
         """从URL中提取域名"""
         try:
             from urllib.parse import urlparse
+
             parsed = urlparse(url)
             return parsed.netloc or "unknown"
         except Exception:
@@ -85,7 +86,9 @@ class RateLimiter:
                 await asyncio.sleep(sleep_time)
                 now = time.time()
                 self.domain_requests[domain] = [
-                    t for t in self.domain_requests[domain] if now - t < self.time_window
+                    t
+                    for t in self.domain_requests[domain]
+                    if now - t < self.time_window
                 ]
 
         self.domain_requests[domain].append(now)
@@ -107,7 +110,9 @@ class RateLimiter:
                 await asyncio.sleep(sleep_time)
                 now = time.time()
                 self.engine_requests[engine] = [
-                    t for t in self.engine_requests[engine] if now - t < self.time_window
+                    t
+                    for t in self.engine_requests[engine]
+                    if now - t < self.time_window
                 ]
 
         self.engine_requests[engine].append(now)

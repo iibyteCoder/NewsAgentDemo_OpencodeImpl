@@ -2,13 +2,12 @@
 
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from loguru import logger
 
-from ..core.config import get_settings
 from ..core.downloader import Downloader
-from ..utils.helpers import extract_image_urls, sanitize_filename
+from ..utils.helpers import extract_image_urls
 
 
 async def download_file(
@@ -132,7 +131,6 @@ async def download_images_from_url(
     Returns:
         JSON格式的下载结果
     """
-    import httpx
 
     logger.info(f"正在获取网页内容: {page_url}")
 

@@ -36,8 +36,9 @@ output/
 # Ruff cache
 .ruff_cache/
 
-# VSCode configuration
-.vscode/
+# VSCode configuration (keep settings.json for team consistency)
+.vscode/*
+!.vscode/settings.json
 
 # Python cache in project directories
 __pycache__/

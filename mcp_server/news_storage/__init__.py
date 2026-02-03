@@ -1,10 +1,33 @@
 """
 News Storage MCP Server - 新闻存储管理器
 
-提供新闻数据的持久化存储和检索功能：
-- 存储新闻的完整信息（标题、URL、摘要、来源、时间等）
-- 支持全文搜索和标签过滤
-- 支持批量操作和统计分析
-- 自动去重（基于URL）
-- 支持更新新闻内容
+公共接口：
+- DatabaseManager: 数据库管理器
+- NewsRepository, ReportSectionRepository: 数据访问层
+- NewsItem, ReportSection: 数据模型
 """
+
+from .db import (
+    DatabaseManager,
+    NewsItem,
+    NewsRepository,
+    ReportSection,
+    ReportSectionRepository,
+    SectionStatus,
+    SectionType,
+    get_db_manager,
+)
+
+__all__ = [
+    # 数据库管理
+    "DatabaseManager",
+    "get_db_manager",
+    # 仓储
+    "NewsRepository",
+    "ReportSectionRepository",
+    # 模型
+    "NewsItem",
+    "ReportSection",
+    "SectionType",
+    "SectionStatus",
+]

@@ -24,7 +24,9 @@ class ToutiaoEngine(BaseEngine):
         """今日头条需要样式表，但可以拦截图片和媒体"""
         return ["image", "media"]
 
-    def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
+    def get_search_url(
+        self, query: str, num_results: int = 30, search_type: str = "web"
+    ) -> str:
         """构建搜索URL"""
         encoded_query = quote(query)
         # 今日头条搜索使用keyword参数
@@ -53,7 +55,8 @@ class ToutiaoEngine(BaseEngine):
             return []
 
         # 解析结果
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const newsItems = document.querySelectorAll('div.result-content');
 
@@ -124,7 +127,8 @@ class ToutiaoEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

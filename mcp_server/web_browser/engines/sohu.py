@@ -20,7 +20,9 @@ class SohuEngine(BaseEngine):
         )
         super().__init__(config)
 
-    def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
+    def get_search_url(
+        self, query: str, num_results: int = 30, search_type: str = "web"
+    ) -> str:
         """构建搜索URL"""
         encoded_query = quote(query)
         # 搜狐搜索使用keyword参数，type=10002表示新闻
@@ -52,11 +54,15 @@ class SohuEngine(BaseEngine):
 
         for attempt in range(max_scroll_attempts):
             # 检查当前已加载的结果数量
-            current_count = await page.evaluate("""() => {
+            current_count = await page.evaluate(
+                """() => {
                 return document.querySelectorAll('div.cards-small-img').length;
-            }""")
+            }"""
+            )
 
-            logger.info(f"   📜 滚动加载 (第{attempt + 1}次): 已加载 {current_count} 条结果")
+            logger.info(
+                f"   📜 滚动加载 (第{attempt + 1}次): 已加载 {current_count} 条结果"
+            )
 
             # 如果已获取足够结果，停止滚动
             if current_count >= num_results:
@@ -64,17 +70,21 @@ class SohuEngine(BaseEngine):
                 break
 
             # 滚动到页面底部
-            await page.evaluate("""() => {
+            await page.evaluate(
+                """() => {
                 window.scrollTo(0, document.body.scrollHeight);
-            }""")
+            }"""
+            )
 
             # 等待新数据加载
             await page.wait_for_timeout(scroll_pause_time)
 
             # 检查是否有新数据加载
-            new_count = await page.evaluate("""() => {
+            new_count = await page.evaluate(
+                """() => {
                 return document.querySelectorAll('div.cards-small-img').length;
-            }""")
+            }"""
+            )
 
             # 如果没有新数据，说明已经到底了
             if new_count == current_count:
@@ -82,7 +92,8 @@ class SohuEngine(BaseEngine):
                 break
 
         # 解析结果
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const newsItems = document.querySelectorAll('div.cards-small-img');
 
@@ -130,7 +141,8 @@ class SohuEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

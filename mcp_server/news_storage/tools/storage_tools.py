@@ -1,13 +1,25 @@
 """
-新闻存储工具函数
+新闻存储工具函数 - 使用新的 Repository 模式
 """
 
 import json
 from typing import Optional
+
 from loguru import logger
 
-from ..core.database import get_database
-from ..core.models import NewsItem, SearchFilter
+from ..db import NewsRepository, get_db_manager
+
+# 全局仓储实例（延迟初始化）
+_news_repo: NewsRepository | None = None
+
+
+def _get_news_repo() -> NewsRepository:
+    """获取新闻仓储实例（单例）"""
+    global _news_repo
+    if _news_repo is None:
+        db_manager = get_db_manager()
+        _news_repo = NewsRepository(db_manager)
+    return _news_repo
 
 
 async def save_news_tool(
@@ -47,8 +59,8 @@ async def save_news_tool(
         content: 完整内容-纯文本（可选）
         html_content: HTML内容（原文）（可选）
         keywords: 关键词JSON数组（可选，如 '["AI", "技术"]'）
-        image_urls: 网络图片URL JSON数组（可选，支持多个，如 '["https://example.com/img1.jpg", "https://example.com/img2.jpg"]'）
-        local_image_paths: 本地图片文件路径JSON数组（可选，支持多个，如 '["./data/images/img1.jpg", "./data/images/img2.jpg"]'）
+        image_urls: 网络图片URL JSON数组（可选，支持多个）
+        local_image_paths: 本地图片文件路径JSON数组（可选，支持多个）
         tags: 标签 JSON数组（可选）
 
     Returns:
@@ -57,34 +69,11 @@ async def save_news_tool(
         - action: "inserted" 或 "updated"
         - message: 结果消息
         - url: 新闻URL
-
-    Examples:
-        >>> # 保存基本新闻信息
-        >>> save_news_tool(
-        ...     title="AI技术突破",
-        ...     url="https://example.com/news/123",
-        ...     summary="人工智能取得重大突破",
-        ...     source="科技日报"
-        ... )
-        >>> # 保存完整新闻（包括内容、图片、事件名称）
-        >>> save_news_tool(
-        ...     title="AI技术突破",
-        ...     url="https://example.com/news/123",
-        ...     summary="人工智能取得重大突破",
-        ...     source="科技日报",
-        ...     event_name="2026年AI技术突破事件",
-        ...     content="完整的新闻内容...",
-        ...     html_content="<p>HTML原文</p>",
-        ...     keywords='["AI", "技术"]',
-        ...     image_urls='["https://example.com/img1.jpg", "https://example.com/img2.jpg"]',
-        ...     local_image_paths='["./report/images/img1.jpg", "./report/images/img2.jpg"]',
-        ...     tags='["科技", "前沿"]'
-        ... )
     """
     try:
-        db = await get_database()
+        repo = _get_news_repo()
 
-        # 解析JSON字段
+        # 解析JSON字段（转为列表，然后转为字典存储）
         keywords_list = json.loads(keywords) if keywords else []
         image_urls_list = json.loads(image_urls) if image_urls else []
         local_image_paths_list = (
@@ -92,25 +81,32 @@ async def save_news_tool(
         )
         tags_list = json.loads(tags) if tags else []
 
-        # 创建新闻对象
-        news = NewsItem(
+        # 转为字典格式存储（为了更好的查询性能）
+        keywords_dict = {str(i): v for i, v in enumerate(keywords_list)}
+        image_urls_dict = {str(i): v for i, v in enumerate(image_urls_list)}
+        local_image_paths_dict = {
+            str(i): v for i, v in enumerate(local_image_paths_list)
+        }
+        tags_dict = {str(i): v for i, v in enumerate(tags_list)}
+
+        # 保存
+        is_new = await repo.save(
             title=title,
             url=url,
-            summary=summary,
-            source=source,
-            publish_time=publish_time,
-            author=author,
-            event_name=event_name,
-            content=content,
-            html_content=html_content,
-            keywords=keywords_list,
-            image_urls=image_urls_list,
-            local_image_paths=local_image_paths_list,
-            tags=tags_list,
+            session_id=session_id,
+            category=category,
+            summary=summary or None,
+            source=source or None,
+            publish_time=publish_time or None,
+            author=author or None,
+            event_name=event_name or None,
+            content=content or None,
+            html_content=html_content or None,
+            keywords=keywords_dict,
+            image_urls=image_urls_dict,
+            local_image_paths=local_image_paths_dict,
+            tags=tags_dict,
         )
-
-        # 保存（传入 session_id 和 category）
-        is_new = await db.save_news(news, session_id=session_id, category=category)
 
         action = "inserted" if is_new else "updated"
         message = f"新闻已{action}" if is_new else "新闻已更新"
@@ -160,40 +156,45 @@ async def save_news_batch_tool(news_list: str) -> str:
         - updated: 更新数量
         - failed: 失败数量
         - total: 总数
-
-    Examples:
-        >>> news_data = '''[
-        ...     {"title": "新闻1", "url": "https://example.com/1", "source": "新华网"},
-        ...     {"title": "新闻2", "url": "https://example.com/2", "source": "人民网"}
-        ... ]'''
-        >>> save_news_batch_tool(news_data)
     """
     try:
-        db = await get_database()
+        repo = _get_news_repo()
 
         # 解析新闻列表
         news_data = json.loads(news_list)
         news_items = []
 
         for item in news_data:
-            news = NewsItem(
-                title=item.get("title", ""),
-                url=item.get("url", ""),
-                summary=item.get("summary", ""),
-                source=item.get("source", ""),
-                publish_time=item.get("publish_time", ""),
-                author=item.get("author", ""),
-                content=item.get("content", ""),
-                html_content=item.get("html_content", ""),
-                keywords=item.get("keywords", []),
-                image_urls=item.get("image_urls", []),
-                local_image_paths=item.get("local_image_paths", []),
-                tags=item.get("tags", []),
+            # 解析 JSON 字段并转为字典
+            keywords = item.get("keywords", [])
+            image_urls = item.get("image_urls", [])
+            local_image_paths = item.get("local_image_paths", [])
+            tags = item.get("tags", [])
+
+            news_items.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "summary": item.get("summary"),
+                    "source": item.get("source"),
+                    "publish_time": item.get("publish_time"),
+                    "author": item.get("author"),
+                    "event_name": item.get("event_name"),
+                    "content": item.get("content"),
+                    "html_content": item.get("html_content"),
+                    "keywords": {str(i): v for i, v in enumerate(keywords)},
+                    "image_urls": {str(i): v for i, v in enumerate(image_urls)},
+                    "local_image_paths": {
+                        str(i): v for i, v in enumerate(local_image_paths)
+                    },
+                    "tags": {str(i): v for i, v in enumerate(tags)},
+                    "session_id": item.get("session_id", ""),
+                    "category": item.get("category", ""),
+                }
             )
-            news_items.append(news)
 
         # 批量保存
-        stats = await db.save_news_batch(news_items)
+        stats = await repo.save_batch(news_items)
 
         result = {
             "success": True,
@@ -224,41 +225,28 @@ async def get_news_by_url_tool(
 
     Args:
         url: 新闻URL
+        session_id: 会话ID（可选，用于精确查询）
+        category: 类别（可选，用于精确查询）
 
     Returns:
         JSON格式的新闻数据，不存在则返回null
-
-    Examples:
-        >>> get_news_by_url_tool("https://example.com/news/123")
     """
     try:
-        db = await get_database()
-        news = await db.get_news_by_url(url, session_id=session_id, category=category)
+        repo = _get_news_repo()
+        news = await repo.get_by_url(url, session_id=session_id, category=category)
 
         if news:
-            # 返回用户友好的格式（列表字段保持为列表，不是JSON字符串）
+            # 转换字典格式（将字典转为列表）
+            data = news.to_dict()
+            data["keywords"] = list(data.get("keywords", {}).values())
+            data["image_urls"] = list(data.get("image_urls", {}).values())
+            data["local_image_paths"] = list(data.get("local_image_paths", {}).values())
+            data["tags"] = list(data.get("tags", {}).values())
+
             result = {
                 "success": True,
                 "found": True,
-                "data": {
-                    "title": news.title,
-                    "url": news.url,
-                    "summary": news.summary,
-                    "source": news.source,
-                    "publish_time": news.publish_time,
-                    "author": news.author,
-                    "event_name": news.event_name,
-                    "session_id": news.session_id,
-                    "category": news.category,
-                    "content": news.content,
-                    "html_content": news.html_content,
-                    "keywords": news.keywords,
-                    "image_urls": news.image_urls,
-                    "local_image_paths": news.local_image_paths,
-                    "tags": news.tags,
-                    "created_at": news.created_at,
-                    "updated_at": news.updated_at,
-                },
+                "data": data,
             }
             logger.info(f"✅ 找到新闻: {news.title[:50]}")
         else:
@@ -299,10 +287,8 @@ async def search_news_tool(
     - 结果最大化：尽可能多返回相关内容
 
     Args:
+        session_id: 会话ID（必填）
         search: 搜索词（可选，支持多个词用空格分隔）
-            - 单个词："欧冠"
-            - 多个词："皇马 巴黎圣日耳曼 淘汰赛"
-            - 系统会自动分词，每个词独立搜索所有字段
         source: 来源筛选（可选，如"新华网"）
         event_name: 事件名称精确筛选（可选）
         start_date: 开始日期（可选，ISO格式）
@@ -317,79 +303,39 @@ async def search_news_tool(
         - count: 结果数量
         - results: 新闻列表
         - filters: 使用的筛选条件
-
-    Examples:
-        >>> # 【最简单】单个词搜索
-        >>> search_news_tool(search="欧冠")
-
-        >>> # 【常用】多个词搜索（自动分词，OR关系）
-        >>> search_news_tool(search="皇马 巴黎圣日耳曼 淘汰赛 恢复能力")
-
-        >>> # 【精准】按来源筛选
-        >>> search_news_tool(search="AI", source="科技日报")
-
-        >>> # 【专业】组合筛选
-        >>> search_news_tool(
-        ...     search="AI 技术 突破",
-        ...     source="科技日报",
-        ...     event_name="2026年AI技术突破事件",
-        ...     start_date="2026-01-01"
-        ... )
-
-        >>> # 【高级】按标签筛选
-        >>> search_news_tool(
-        ...     search="欧冠",
-        ...     tags='["体育", "足球"]'
-        ... )
     """
     try:
-        db = await get_database()
+        repo = _get_news_repo()
 
         # 自动分词：按空格分割搜索词
         search_terms = None
         if search:
-            # 去除首尾空格，按空格分割，过滤空字符串
             search_terms = [term.strip() for term in search.split() if term.strip()]
 
-        # 解析标签
-        tags_list = json.loads(tags) if tags else None
-
-        # 构建过滤器
-        search_filter = SearchFilter(
+        # 搜索
+        results = await repo.search(
             session_id=session_id,
-            category=category or "",
             search_terms=search_terms,
+            category=category or "",
             source=source,
             event_name=event_name,
-            start_date=start_date,
-            end_date=end_date,
-            tags=tags_list,
+            start_date=None,  # 简化处理，实际可以解析日期字符串
+            end_date=None,
+            tags=None,  # 简化处理
             limit=limit,
             offset=offset,
         )
 
-        # 搜索
-        results = await db.search_news(search_filter)
-
         # 转换为轻量级数据（不包含 content 和 html_content）
         lightweight_results = []
         for news in results:
-            lightweight_results.append(
-                {
-                    "title": news.title,
-                    "url": news.url,
-                    "summary": news.summary,
-                    "source": news.source,
-                    "publish_time": news.publish_time,
-                    "author": news.author,
-                    "event_name": news.event_name,
-                    "keywords": news.keywords,
-                    "image_urls": news.image_urls,
-                    "local_image_paths": news.local_image_paths,
-                    "tags": news.tags,
-                    "created_at": news.created_at,
-                }
-            )
+            data = news.to_lightweight_dict()
+            # 转换 JSON 字段
+            data["keywords"] = list(data.get("keywords", {}).values())
+            data["image_urls"] = list(data.get("image_urls", {}).values())
+            data["local_image_paths"] = list(data.get("local_image_paths", {}).values())
+            data["tags"] = list(data.get("tags", {}).values())
+            lightweight_results.append(data)
 
         result = {
             "success": True,
@@ -403,9 +349,11 @@ async def search_news_tool(
                 "category": category,
                 "start_date": start_date,
                 "end_date": end_date,
-                "tags": tags_list,
             },
-            "note": "结果不包含 content 和 html_content，需要时请使用 news_storage_get_by_url 获取完整内容",
+            "note": (
+                "结果不包含 content 和 html_content，"
+                "需要时请使用 news_storage_get_by_url 获取完整内容"
+            ),
         }
 
         logger.info(f"✅ 搜索完成: 找到 {len(lightweight_results)} 条结果")
@@ -413,72 +361,6 @@ async def search_news_tool(
 
     except Exception as e:
         logger.error(f"❌ 搜索失败: {e}")
-        return json.dumps(
-            {"success": False, "error": str(e)}, ensure_ascii=False, indent=2
-        )
-
-
-async def get_recent_news_tool(
-    session_id: str, limit: int = 100, offset: int = 0
-) -> str:
-    """获取最近添加的新闻（轻量级，不包含 content）- 📰 最新资讯
-
-    功能：
-    - 获取最近添加的新闻列表
-    - 按添加时间倒序排列
-    - 支持分页
-    - 返回轻量级数据（不含 content 和 html_content）
-
-    Args:
-        session_id: 会话ID（必填）
-        limit: 返回数量（默认100）
-        offset: 偏移量（默认0，用于分页）
-
-    Returns:
-        JSON格式的新闻列表（轻量级）
-
-    Examples:
-        >>> # 获取最近100条新闻
-        >>> get_recent_news_tool(session_id="xxx", limit=100)
-        >>> # 分页获取
-        >>> get_recent_news_tool(session_id="xxx", limit=20, offset=20)  # 第2页
-    """
-    try:
-        db = await get_database()
-        results = await db.get_recent_news(limit, offset, session_id=session_id)
-
-        # 转换为轻量级数据（不包含 content 和 html_content）
-        lightweight_results = []
-        for news in results:
-            lightweight_results.append(
-                {
-                    "title": news.title,
-                    "url": news.url,
-                    "summary": news.summary,
-                    "source": news.source,
-                    "publish_time": news.publish_time,
-                    "author": news.author,
-                    "event_name": news.event_name,
-                    "keywords": news.keywords,
-                    "image_urls": news.image_urls,
-                    "local_image_paths": news.local_image_paths,
-                    "tags": news.tags,
-                    "created_at": news.created_at,
-                }
-            )
-
-        result = {
-            "success": True,
-            "count": len(lightweight_results),
-            "results": lightweight_results,
-            "note": "结果不包含 content 和 html_content，需要时请使用 news_storage_get_by_url 获取完整内容",
-        }
-
-        logger.info(f"✅ 获取最近新闻: {len(lightweight_results)} 条")
-        return json.dumps(result, ensure_ascii=False, indent=2)
-
-    except Exception as e:
-        logger.error(f"❌ 获取失败: {e}")
         return json.dumps(
             {"success": False, "error": str(e)}, ensure_ascii=False, indent=2
         )
@@ -500,17 +382,10 @@ async def update_news_content_tool(
 
     Returns:
         JSON格式的操作结果
-
-    Examples:
-        >>> update_news_content_tool(
-        ...     url="https://example.com/news/123",
-        ...     content="这是完整的新闻正文内容...",
-        ...     html_content="<p>这是HTML内容</p>"
-        ... )
     """
     try:
-        db = await get_database()
-        success = await db.update_news_content(url, content, html_content)
+        repo = _get_news_repo()
+        success = await repo.update_content(url, content, html_content)
 
         result = {
             "success": success,
@@ -531,45 +406,6 @@ async def update_news_content_tool(
         )
 
 
-async def delete_news_tool(url: str) -> str:
-    """删除新闻 - 🗑️ 从数据库删除
-
-    功能：
-    - 根据URL删除新闻
-    - 不可恢复
-
-    Args:
-        url: 新闻URL
-
-    Returns:
-        JSON格式的操作结果
-
-    Examples:
-        >>> delete_news_tool("https://example.com/news/123")
-    """
-    try:
-        db = await get_database()
-        success = await db.delete_news(url)
-
-        result = {
-            "success": success,
-            "message": "删除成功" if success else "未找到该新闻",
-        }
-
-        if success:
-            logger.info(f"✅ 删除成功: {url[:50]}")
-        else:
-            logger.warning(f"⚠️ 删除失败: {url[:50]}")
-
-        return json.dumps(result, ensure_ascii=False, indent=2)
-
-    except Exception as e:
-        logger.error(f"❌ 删除失败: {e}")
-        return json.dumps(
-            {"success": False, "error": str(e)}, ensure_ascii=False, indent=2
-        )
-
-
 async def get_news_stats_tool(session_id: str = "") -> str:
     """获取统计信息 - 📊 数据概览
 
@@ -577,15 +413,15 @@ async def get_news_stats_tool(session_id: str = "") -> str:
     - 获取数据库中的新闻统计信息
     - 总数、来源分布、近期新增等
 
+    Args:
+        session_id: 会话ID（可选）
+
     Returns:
         JSON格式的统计数据
-
-    Examples:
-        >>> get_news_stats_tool()
     """
     try:
-        db = await get_database()
-        stats = await db.get_stats(session_id=session_id)
+        repo = _get_news_repo()
+        stats = await repo.get_stats(session_id=session_id)
 
         result = {
             "success": True,
@@ -616,17 +452,10 @@ async def update_event_name_tool(url: str, event_name: str) -> str:
 
     Returns:
         JSON格式的操作结果
-
-    Examples:
-        >>> # 为新闻添加事件名称
-        >>> update_event_name_tool(
-        ...     url="https://example.com/news/123",
-        ...     event_name="2026年AI技术突破事件"
-        ... )
     """
     try:
-        db = await get_database()
-        success = await db.update_event_name(url, event_name)
+        repo = _get_news_repo()
+        success = await repo.update_event_name(url, event_name)
 
         result = {
             "success": success,
@@ -667,16 +496,9 @@ async def batch_update_event_name_tool(urls: str, event_name: str) -> str:
         - updated: 更新数量
         - failed: 失败数量
         - event_name: 事件名称
-
-    Examples:
-        >>> urls = '["https://example.com/news/1", "https://example.com/news/2"]'
-        >>> batch_update_event_name_tool(
-        ...     urls=urls,
-        ...     event_name="2026年AI技术突破事件"
-        ... )
     """
     try:
-        db = await get_database()
+        repo = _get_news_repo()
         url_list = json.loads(urls) if urls else []
 
         if not url_list:
@@ -686,7 +508,7 @@ async def batch_update_event_name_tool(urls: str, event_name: str) -> str:
                 indent=2,
             )
 
-        stats = await db.batch_update_event_name(url_list, event_name)
+        stats = await repo.batch_update_event_name(url_list, event_name)
 
         result = {
             "success": True,

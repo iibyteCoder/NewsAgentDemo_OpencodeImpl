@@ -14,6 +14,7 @@ dependencies = [
     "newspaper3k",
     "playwright",
     "pydantic-settings>=2.0.0",
+    "sqlmodel>=0.0.22",
     "trafilatura",
 ]
 
@@ -23,3 +24,45 @@ packages = ["mcp_server", "prompts", "templates"]
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "ruff>=0.9.0",
+    "sqlalchemy[mypy]>=2.0.46",
+]
+
+[tool.ruff]
+# 目标 Python 版本
+target-version = "py313"
+
+# 每行最大字符数
+line-length = 100
+
+[tool.ruff.lint]
+# 启用的规则集
+select = [
+    "F",   # Pyflakes（未使用导入等）
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "I",   # isort（导入排序）
+]
+
+# 可自动修复的规则
+fixable = ["ALL"]
+
+# 未使用导入的检测规则
+# F401: imported but unused
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# 为特定文件忽略规则
+"__init__.py" = ["F401"]  # __init__.py 中导出但未使用的导入是允许的
+
+[tool.mypy]
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

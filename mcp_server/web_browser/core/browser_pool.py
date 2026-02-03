@@ -3,20 +3,21 @@
 import asyncio
 import json
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 from loguru import logger
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from playwright.async_api import Browser, BrowserContext, async_playwright
 
-from ..config.settings import get_settings, Settings
+from ..config.settings import Settings, get_settings
 
 
 @dataclass
 class ContextInfo:
     """上下文信息"""
+
     context: BrowserContext
     created_at: datetime
     last_used: datetime
@@ -83,7 +84,9 @@ class BrowserPool:
 
                     launch_args = self._get_launch_args()
 
-                    self._browser = await self._playwright.chromium.launch(**launch_args)
+                    self._browser = await self._playwright.chromium.launch(
+                        **launch_args
+                    )
                     logger.info("✅ 全局浏览器实例已启动")
 
         return self._browser
@@ -115,7 +118,9 @@ class BrowserPool:
 
         return args
 
-    async def _get_or_create_context(self, user_agent: str, viewport: dict = None, engine=None) -> BrowserContext:
+    async def _get_or_create_context(
+        self, user_agent: str, viewport: dict = None, engine=None
+    ) -> BrowserContext:
         """从池中获取或创建 BrowserContext"""
         async with self._context_lock:
             # 清理过期的 Context
@@ -158,7 +163,9 @@ class BrowserPool:
 
             return context
 
-    async def _create_context(self, browser: Browser, user_agent: str, viewport: dict = None, engine=None) -> BrowserContext:
+    async def _create_context(
+        self, browser: Browser, user_agent: str, viewport: dict = None, engine=None
+    ) -> BrowserContext:
         """创建新的浏览器上下文"""
         context_options = {
             "viewport": viewport or {"width": 1920, "height": 1080},
@@ -177,19 +184,23 @@ class BrowserPool:
         # 设置资源拦截（使用引擎的策略）
         if engine:
             block_list = engine.get_resource_block_list()
-            await context.route("**/*", lambda route: self._block_resources_with_list(route, block_list))
+            await context.route(
+                "**/*", lambda route: self._block_resources_with_list(route, block_list)
+            )
         else:
             # 默认策略
             await context.route("**/*", self._block_resources)
 
         # 设置额外请求头
-        await context.set_extra_http_headers({
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Cache-Control": "max-age=0",
-            "Connection": "keep-alive",
-            "DNT": "1",
-        })
+        await context.set_extra_http_headers(
+            {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "DNT": "1",
+            }
+        )
 
         # 添加反检测脚本
         await context.add_init_script(self._get_anti_detection_script())
@@ -207,7 +218,11 @@ class BrowserPool:
 
         # 只拦截图片、字体、媒体文件等重型资源
         # 保留样式表(stylesheet)、脚本(script)、文档(document)等核心资源
-        if resource_type in ["image", "font", "media"] or "icon" in url or "favicon" in url:
+        if (
+            resource_type in ["image", "font", "media"]
+            or "icon" in url
+            or "favicon" in url
+        ):
             await route.abort()
         else:
             await route.continue_()
@@ -255,7 +270,10 @@ class BrowserPool:
 
         for ctx_info in self._context_pool:
             idle_time = (now - ctx_info.last_used).total_seconds()
-            if idle_time > self.settings.context_max_idle_time and len(ctx_info.context.pages) == 0:
+            if (
+                idle_time > self.settings.context_max_idle_time
+                and len(ctx_info.context.pages) == 0
+            ):
                 to_remove.append(ctx_info)
 
         for ctx_info in to_remove:
@@ -267,7 +285,9 @@ class BrowserPool:
                 logger.debug(f"清理 Context 失败: {e}")
 
     @asynccontextmanager
-    async def get_page(self, user_agent: str = None, viewport: dict = None, engine=None):
+    async def get_page(
+        self, user_agent: str = None, viewport: dict = None, engine=None
+    ):
         """获取一个浏览器页面（上下文管理器）
 
         用法:
@@ -285,6 +305,7 @@ class BrowserPool:
         """
         if user_agent is None:
             from ..utils.helpers import get_random_user_agent
+
             user_agent = get_random_user_agent()
 
         async with self._semaphore:
@@ -315,7 +336,7 @@ class BrowserPool:
             return
 
         try:
-            with open(cookie_file, 'r', encoding='utf-8') as f:
+            with open(cookie_file, "r", encoding="utf-8") as f:
                 cookies_data = json.load(f)
 
             if cookies_data:
@@ -328,9 +349,11 @@ class BrowserPool:
         """保存Cookies到文件"""
         try:
             cookies = await context.cookies()
-            with open(self.settings.cookie_file, 'w', encoding='utf-8') as f:
+            with open(self.settings.cookie_file, "w", encoding="utf-8") as f:
                 json.dump(cookies, f, indent=2, ensure_ascii=False)
-            logger.info(f"💾 已保存 {len(cookies)} 个Cookies到 {self.settings.cookie_file}")
+            logger.info(
+                f"💾 已保存 {len(cookies)} 个Cookies到 {self.settings.cookie_file}"
+            )
         except Exception as e:
             logger.error(f"保存Cookies失败: {e}")
 
@@ -340,7 +363,9 @@ class BrowserPool:
             # 关闭所有 Context
             async with self._context_lock:
                 if self._context_pool:
-                    logger.info(f"🔒 关闭 {len(self._context_pool)} 个 BrowserContext...")
+                    logger.info(
+                        f"🔒 关闭 {len(self._context_pool)} 个 BrowserContext..."
+                    )
                     for ctx_info in self._context_pool:
                         try:
                             await ctx_info.context.close()

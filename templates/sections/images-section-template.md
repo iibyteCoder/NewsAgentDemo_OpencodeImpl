@@ -1,23 +1,8 @@
 # 相关图片模板
 
-## 模板格式
-
-## 图片总览
-
-- **图片总数**: {total_count}张
-- **成功下载**: {downloaded_count}张
-- **下载失败**: {failed_count}张
-- **图片存储路径**: `./{event_folder}/`
-
 ---
 
-## 按新闻来源分类
-
-{images_by_source}
-
----
-
-_图片最后更新时间：{update_time}_
+<!-- TEMPLATE_DOC_START: 以下是模板使用说明，生成内容时请删除此部分 -->
 
 ## 说明
 
@@ -48,3 +33,22 @@ _图片最后更新时间：{update_time}_
 - `{filename}` - 图片文件名
 - `{size}` - 文件大小
 - `{description}` - 图片说明
+
+<!-- TEMPLATE_DOC_END: 模板使用说明结束 -->
+
+---
+
+## 模板格式
+
+### 图片总览
+
+- **图片总数**: {total_count}张
+- **成功下载**: {downloaded_count}张
+- **下载失败**: {failed_count}张
+- **图片存储路径**: `./{event_folder}/`
+
+### 按新闻来源分类
+
+{images_by_source}
+
+_图片最后更新时间：{update_time}_

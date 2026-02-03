@@ -1,26 +1,8 @@
 # 事件时间轴模板
 
-## 发展脉络
-
-{development_path}
-
 ---
 
-## 关键时间节点
-
-{timeline_items}
-
----
-
-## 影响与后果
-
-{impacts_and_consequences}
-
----
-
-_时间轴构建时间：{timeline_build_time}_
-
----
+<!-- TEMPLATE_DOC_START: 以下是模板使用说明，生成内容时请删除此部分 -->
 
 ## 填充格式说明
 
@@ -79,3 +61,23 @@ importance_level = 3 → ⭐⭐⭐ 高度重要
 importance_level = 2 → ⭐⭐ 重要
 importance_level = 1 → ⭐ 一般
 ```
+
+<!-- TEMPLATE_DOC_END: 模板使用说明结束 -->
+
+---
+
+## 模板格式
+
+### 发展脉络
+
+{development_path}
+
+### 关键时间节点
+
+{timeline_items}
+
+### 影响与后果
+
+{impacts_and_consequences}
+
+_时间轴构建时间：{timeline_build_time}_

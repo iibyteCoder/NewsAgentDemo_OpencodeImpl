@@ -22,25 +22,29 @@ API引擎：Serper.dev（Google Search API，无需浏览器）
 - 智能降级，确保高可用性
 """
 
-from mcp.server.fastmcp import FastMCP
 from loguru import logger
+from mcp.server.fastmcp import FastMCP
 
 from .config.settings import get_settings
 from .tools import (
-    multi_search,
     fetch_article_content,
-    baidu_hot_search,
+    multi_search,
 )
 
 # 初始化配置
 settings = get_settings()
-logger.info("🚀 Web Browser MCP Server 启动")
-logger.info(f"   启用的搜索引擎: {', '.join(settings.enabled_engines)}")
-logger.info("   智能反爬虫检测: ✅ 已启用")
-logger.info("   自动引擎禁用: ✅ 已启用（5-30分钟递增）")
 
 # 创建 FastMCP 服务器
-server = FastMCP("web_browser")
+server = FastMCP(
+    name="web_browser",
+    # 可用性配置
+    retry_interval=5,  # 连接重试间隔（秒）
+    stateless_http=True,  # 无状态 HTTP 模式（提高可扩展性）
+    json_response=True,  # 使用 JSON 响应格式
+    # 监控配置
+    log_level="INFO",
+    debug=False,
+)
 
 
 # ========== 注册工具函数 ==========
@@ -72,15 +76,18 @@ async def multi_search_tool(
 
     # 记录统计信息
     import json
+
     result_data = json.loads(result)
     available = result_data.get("available_engines", "?")
     banned = result_data.get("banned_engines", "?")
 
     if result_data.get("total", 0) > 0:
-        logger.info(f"   ✅ 搜索成功: {result_data.get('engine_name')} 返回 {result_data.get('total')} 条结果")
+        logger.info(
+            f"   ✅ 搜索成功: {result_data.get('engine_name')} 返回 {result_data.get('total')} 条结果"
+        )
         logger.info(f"   📊 引擎状态: 可用 {available} 个, 被禁用 {banned} 个")
     else:
-        logger.warning(f"   ⚠️ 搜索失败或返回0条结果")
+        logger.warning("   ⚠️ 搜索失败或返回0条结果")
         logger.warning(f"   📊 引擎状态: 可用 {available} 个, 被禁用 {banned} 个")
 
     return result
@@ -107,16 +114,6 @@ async def fetch_article_content_tool(
     返回结构详见: docs/MCP工具使用说明.md
     """
     return await fetch_article_content(url, include_images)
-
-
-@server.tool(name="web-browser_baidu_hot_search_tool")
-async def baidu_hot_search_tool() -> str:
-    """获取百度热搜榜 - 使用 Playwright 浏览器自动化
-
-    Returns:
-        JSON 格式的热搜榜单（前50条）
-    """
-    return await baidu_hot_search()
 
 
 if __name__ == "__main__":

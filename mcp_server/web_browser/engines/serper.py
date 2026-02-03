@@ -11,6 +11,7 @@ from loguru import logger
 @dataclass
 class SearchResult:
     """搜索结果"""
+
     title: str
     url: str
     summary: str = ""
@@ -21,6 +22,7 @@ class SearchResult:
 @dataclass
 class SerperConfig:
     """Serper 配置"""
+
     api_key: str
     search_url: str = "https://google.serper.dev/search"
     news_url: str = "https://google.serper.dev/news"
@@ -163,6 +165,7 @@ class SerperEngine:
         """从 URL 中提取域名"""
         try:
             from urllib.parse import urlparse
+
             parsed = urlparse(url)
             return parsed.netloc or "unknown"
         except Exception:
@@ -172,6 +175,8 @@ class SerperEngine:
         """从 URL 中提取域名（公开方法）"""
         return self._extract_domain(url)
 
-    def get_search_url(self, _query: str, _num_results: int, search_type: str = "web") -> str:
+    def get_search_url(
+        self, _query: str, _num_results: int, search_type: str = "web"
+    ) -> str:
         """构建搜索 URL（用于兼容，实际不使用）"""
         return self.config.news_url if search_type == "news" else self.config.search_url

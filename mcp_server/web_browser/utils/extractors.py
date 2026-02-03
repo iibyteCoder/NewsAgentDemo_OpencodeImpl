@@ -8,7 +8,6 @@
 - 智能提取标题和正文
 """
 
-from typing import Optional
 from loguru import logger
 
 

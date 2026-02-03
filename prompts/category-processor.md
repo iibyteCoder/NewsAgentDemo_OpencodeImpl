@@ -11,10 +11,10 @@ maxSteps: 30
 
 ## 核心职责
 
-1. 根据查询模式搜索新闻（广泛模式/精确模式）
+1. **搜索热点新闻**（广泛模式/精确模式）- 优先收集热点、高影响力新闻
 2. 并行处理所有新闻链接（调用 @news-processor）
 3. 聚合新闻为事件（调用 @event-aggregator）
-4. 选择最重要的事件进行处理
+4. 选择最重要的事件进行处理（按新闻数量和热度排序）
 5. 生成类别索引文件
 
 ## 输入参数
@@ -51,11 +51,7 @@ maxSteps: 30
 
 ### 1. 搜索新闻
 
-使用 `web-browser_multi_search_tool` 搜索：
-
-- num_results: 5-10
-- search_type: "news"
-- engine: "auto"
+优先收集热点、高影响力新闻，避免泛泛内容。
 
 ### 2. 数据检查
 
@@ -68,17 +64,9 @@ maxSteps: 30
 
 **关键**：所有链接必须同时调用 @news-processor，并行处理
 
-#### ⚠️ 重要：提供完整信息避免丢失
+#### ⚠️ 重要：传递完整新闻信息
 
-在调用 @news-processor 时，**强烈建议传递完整的新闻信息**，而不仅仅是 URL：
-
-- ✅ **推荐**：如果搜索结果包含 `title`、`publish_time`、`source`、`author` 等信息，**务必传递**
-- ✅ **原因**：避免网页结构变化、反爬虫、网络问题导致的信息提取失败
-- ✅ **好处**：即使网页无法访问，也能保存已有的关键信息
-
-传递参数：
-
-**方式 1（推荐）**：提供完整新闻数据
+调用 @news-processor 时传递完整信息，避免网页提取失败：
 
 ```python
 Task("@news-processor", prompt=f"""
@@ -95,19 +83,6 @@ session_id: {session_id}
 category: {category}
 """)
 ```
-
-**方式 2（不推荐）**：只提供 URL（可能丢失信息）
-
-```python
-Task("@news-processor", prompt=f"""
-处理这个链接：{news_url}
-
-session_id: {session_id}
-category: {category}
-""")
-```
-
-**注意**：优先使用方式 1，只有在搜索结果不包含详细信息时才使用方式 2。
 
 ### 4. 聚合为事件
 
@@ -137,7 +112,7 @@ Task("@event-aggregator", prompt=f"""
 
 ### 6. 选择并处理事件
 
-选择最重要的一个事件（新闻数量最多或最具代表性），调用 @event-processor 进行完整处理，必须传递以下参数：
+选择最重要的一个事件（优先热点：新闻数量多、时效性强、影响力大），调用 @event-processor 进行完整处理，必须传递以下参数：
 
 ```python
 Task("@event-processor", prompt=f"""

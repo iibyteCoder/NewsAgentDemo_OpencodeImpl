@@ -1,7 +1,7 @@
 """集中配置管理 - 使用 Pydantic 进行配置验证"""
 
 from functools import lru_cache
-from typing import Optional, List
+from typing import List, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,6 +44,20 @@ class Settings(BaseSettings):
     headless: bool = Field(
         default=True,
         description="是否使用无头模式",
+    )
+
+    # ========== 超时配置 ==========
+    page_load_timeout: int = Field(
+        default=30000,
+        description="页面加载超时时间（毫秒）",
+        ge=5000,
+        le=120000,
+    )
+    page_navigation_timeout: int = Field(
+        default=30000,
+        description="页面导航超时时间（毫秒）",
+        ge=5000,
+        le=120000,
     )
 
     # ========== 速率限制配置 ==========

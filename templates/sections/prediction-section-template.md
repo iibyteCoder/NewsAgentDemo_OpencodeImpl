@@ -1,33 +1,8 @@
 # 趋势预测模板
 
-## 情景分析
-
-{scenarios_content}
-
 ---
 
-## 关键影响因素
-
-{key_factors_content}
-
----
-
-## 结论与建议
-
-### 核心结论
-
-{core_conclusion}
-
-### 建议/展望
-
-{recommendations}
-
----
-
-_预测生成时间：{prediction_time}_
-_数据来源：综合分析{sources_count}个来源 | 专家观点{expert_count}条 | 历史案例{case_count}个_
-
----
+<!-- TEMPLATE_DOC_START: 以下是模板使用说明，生成内容时请删除此部分 -->
 
 ## 填充格式说明
 
@@ -95,3 +70,30 @@ _数据来源：综合分析{sources_count}个来源 | 专家观点{expert_count
 **风险提示**：
 - {risk_1} ([来源]({source_url}))
 ```
+
+<!-- TEMPLATE_DOC_END: 模板使用说明结束 -->
+
+---
+
+## 模板格式
+
+### 情景分析
+
+{scenarios_content}
+
+### 关键影响因素
+
+{key_factors_content}
+
+### 结论与建议
+
+#### 核心结论
+
+{core_conclusion}
+
+#### 建议/展望
+
+{recommendations}
+
+_预测生成时间：{prediction_time}_
+_数据来源：综合分析{sources_count}个来源 | 专家观点{expert_count}条 | 历史案例{case_count}个_

@@ -20,7 +20,9 @@ class TencentEngine(BaseEngine):
         )
         super().__init__(config)
 
-    def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
+    def get_search_url(
+        self, query: str, num_results: int = 30, search_type: str = "web"
+    ) -> str:
         """构建搜索URL"""
         encoded_query = quote(query)
         # 腾讯新闻搜索使用query参数
@@ -47,7 +49,8 @@ class TencentEngine(BaseEngine):
             return []
 
         # 解析结果
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const newsItems = document.querySelectorAll('div.img-text-card');
 
@@ -81,7 +84,8 @@ class TencentEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

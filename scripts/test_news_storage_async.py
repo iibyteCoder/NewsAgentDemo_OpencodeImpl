@@ -159,9 +159,9 @@ async def test_database():
 
 async def test_storage_tools():
     """测试存储工具函数"""
-    from mcp_server.news_storage.tools.storage_tools import (
-        save_news_tool,
+    from mcp_server.news_storage.tools import (
         get_news_by_url_tool,
+        save_news_tool,
         search_news_tool,
         get_recent_news_tool,
     )

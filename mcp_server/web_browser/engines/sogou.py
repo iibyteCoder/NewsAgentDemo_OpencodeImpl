@@ -44,7 +44,8 @@ class SogouEngine(BaseEngine):
 
     async def _parse_results(self, page: Page) -> List[SearchResult]:
         """解析搜索结果"""
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const mainContainer = document.querySelector('#main');
             if (!mainContainer) return results;
@@ -118,7 +119,8 @@ class SogouEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

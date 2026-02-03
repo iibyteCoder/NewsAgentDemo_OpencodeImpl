@@ -24,7 +24,9 @@ class WangyiEngine(BaseEngine):
         """网易可以拦截更多资源以加快速度"""
         return []
 
-    def get_search_url(self, query: str, num_results: int = 30, search_type: str = "web") -> str:
+    def get_search_url(
+        self, query: str, num_results: int = 30, search_type: str = "web"
+    ) -> str:
         """构建搜索URL"""
         encoded_query = quote(query)
         # 网易搜索使用keyword参数
@@ -51,7 +53,8 @@ class WangyiEngine(BaseEngine):
             return []
 
         # 解析结果
-        raw_results = await page.evaluate("""() => {
+        raw_results = await page.evaluate(
+            """() => {
             const results = [];
             const newsItems = document.querySelectorAll('div.keyword_new');
 
@@ -83,7 +86,8 @@ class WangyiEngine(BaseEngine):
             });
 
             return results;
-        }""")
+        }"""
+        )
 
         # 转换为 SearchResult 对象
         results = [SearchResult(**r) for r in raw_results]

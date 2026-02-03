@@ -16,7 +16,7 @@ Web Browser MCP Server - 智能浏览器与搜索工具
 __version__ = "0.2.0"
 
 from .config.settings import Settings, get_settings
-from .core import RateLimiter, BrowserPool, get_browser_pool
+from .core import BrowserPool, RateLimiter, get_browser_pool
 from .engines import BaseEngine, EngineFactory
 
 __all__ = [

@@ -33,7 +33,7 @@ async def check_fetch_images():
 
 async def check_database_save():
     """测试保存到数据库时是否包含图片"""
-    from mcp_server.news_storage.tools.storage_tools import save_news_tool
+    from mcp_server.news_storage.tools import save_news_tool
 
     print("\n" + "="*60)
     print("测试保存新闻（带图片）")
@@ -63,7 +63,7 @@ async def check_database_save():
     print(f"\n保存结果: {json.dumps(result, indent=2, ensure_ascii=False)}")
 
     # 验证保存后的数据
-    from mcp_server.news_storage.tools.storage_tools import get_news_by_url_tool
+    from mcp_server.news_storage.tools import get_news_by_url_tool
     saved_news_str = await get_news_by_url_tool("https://test.example.com/test-image-002")
     saved_news = json.loads(saved_news_str)
 

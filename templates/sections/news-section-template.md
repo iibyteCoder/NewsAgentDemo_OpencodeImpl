@@ -1,25 +1,8 @@
 # 新闻来源模板
 
-## 模板格式
-
-## 今日新闻
-
-{today_news}
-
-## 相关新闻
-
-{related_news}
-
 ---
 
-**统计信息**：
-
-- 今日新闻：{today_count}条
-- 相关新闻：{related_count}条
-- 总计：{total_count}条
-- 主要来源：{main_sources}
-
----
+<!-- TEMPLATE_DOC_START: 以下是模板使用说明，生成内容时请删除此部分 -->
 
 ## 说明
 
@@ -50,3 +33,24 @@
 - `{source}` - 媒体名称
 - `{publish_time}` - 发布时间
 - `{summary}` - 新闻摘要
+
+<!-- TEMPLATE_DOC_END: 模板使用说明结束 -->
+
+---
+
+## 模板格式
+
+### 今日新闻
+
+{today_news}
+
+### 相关新闻
+
+{related_news}
+
+**统计信息**：
+
+- 今日新闻：{today_count}条
+- 相关新闻：{related_count}条
+- 总计：{total_count}条
+- 主要来源：{main_sources}

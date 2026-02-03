@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 @dataclass
 class EngineConfig:
     """搜索引擎配置"""
+
     name: str  # 显示名称
     search_url: str  # 搜索URL模板，使用 {query} 和 {num}
     news_url: str  # 新闻搜索URL模板
@@ -18,6 +19,7 @@ class EngineConfig:
 @dataclass
 class SearchResult:
     """搜索结果"""
+
     title: str
     url: str
     summary: str = ""
@@ -28,6 +30,7 @@ class SearchResult:
 @dataclass
 class SearchResultWithStatus:
     """带状态的搜索结果"""
+
     results: List[SearchResult] = field(default_factory=list)
     blocked: bool = False
     block_reason: str = ""
@@ -84,7 +87,9 @@ class BaseEngine(ABC):
         """
         pass
 
-    def get_search_url(self, query: str, num_results: int, search_type: str = "web") -> str:
+    def get_search_url(
+        self, query: str, num_results: int, search_type: str = "web"
+    ) -> str:
         """构建搜索URL"""
         import urllib.parse
 
@@ -113,7 +118,7 @@ class BaseEngine(ABC):
         import urllib.parse
 
         # 如果是相对路径，加上域名
-        if url.startswith('/') and base_url:
+        if url.startswith("/") and base_url:
             try:
                 parsed_base = urllib.parse.urlparse(base_url)
                 return f"{parsed_base.scheme}://{parsed_base.netloc}{url}"
