@@ -9,8 +9,8 @@ from typing import Optional
 from loguru import logger
 from mcp.server.fastmcp import FastMCP
 
-from news_storage import ReportSectionRepository
-from news_storage.tools import (
+from mcp_server.news_storage import ReportSectionRepository
+from mcp_server.news_storage.tools import (
     batch_update_event_name_tool,
     get_all_report_sections_tool,
     get_images_by_event_tool,
