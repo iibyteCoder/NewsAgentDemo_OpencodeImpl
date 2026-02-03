@@ -14,7 +14,7 @@ maxSteps: 30
 1. **搜索热点新闻**（广泛模式/精确模式）- 优先收集热点、高影响力新闻
 2. 并行处理所有新闻链接（调用 @news-processor）
 3. 聚合新闻为事件（调用 @event-aggregator）
-4. 选择最重要的事件进行处理（按新闻数量和热度排序）
+4. 并行处理所有事件（调用 @event-processor）
 5. 生成类别索引文件
 
 ## 输入参数
@@ -110,9 +110,11 @@ Task("@event-aggregator", prompt=f"""
 - 有匹配事件 → 继续
 - 无匹配事件 → 返回 no_matching_events，终止任务
 
-### 6. 选择并处理事件
+### 6. 并行处理所有事件
 
-选择最重要的一个事件（优先热点：新闻数量多、时效性强、影响力大），调用 @event-processor 进行完整处理，必须传递以下参数：
+**关键**：所有事件必须同时调用 @event-processor，并行处理
+
+对每个事件调用 @event-processor 进行完整处理，必须传递以下参数：
 
 ```python
 Task("@event-processor", prompt=f"""
@@ -127,6 +129,7 @@ Task("@event-processor", prompt=f"""
 
 **⚠️ 关键要求**：
 
+- 所有事件必须同时启动（并行执行）
 - 必须传递 `session_id`、`event_name`、`category`、`report_timestamp`、`date` 参数
 - `report_timestamp` 是生成正确目录结构的关键参数
 - ❌ 禁止省略任何必需参数
@@ -184,11 +187,10 @@ Task("@category-indexer", prompt=f"""
    - ❌ 禁止使用 `date` 替代 `report_timestamp`
 
 2. **session_id管理** - 从prompt参数获取，禁止自己生成
-3. **并行处理** - 所有新闻链接必须同时调用@news-processor
+3. **并行处理** - 所有新闻链接和事件处理必须并行执行
 4. **数据验证** - 每个步骤后检查数据，无数据立即终止
-5. **单事件处理** - 只选择并处理一个最重要的事件
-6. **模式识别** - 准确识别广泛模式vs精确模式
-7. **禁止直接获取内容** - 必须通过@news-processor获取文章内容
+5. **模式识别** - 准确识别广泛模式vs精确模式
+6. **禁止直接获取内容** - 必须通过@news-processor获取文章内容
 
 ## 错误处理
 

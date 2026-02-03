@@ -5,7 +5,6 @@
 from typing import Optional
 
 from sqlalchemy import String, Text
-from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base, TimestampMixin
@@ -80,8 +79,8 @@ class ReportSection(Base, TimestampMixin):
     event_name: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    # 数据和状态
-    content_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # 数据和状态（TEXT 类型，支持任意格式数据）
+    content_data: Mapped[str] = mapped_column(Text, nullable=False, default="")
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=SectionStatus.PENDING, index=True
     )

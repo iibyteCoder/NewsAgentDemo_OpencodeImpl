@@ -30,7 +30,7 @@ class ReportSectionRepository:
         session_id: str,
         event_name: str,
         category: str,
-        content_data: dict[str, Any],
+        content_data: str,
     ) -> str:
         """保存报告部分
 
@@ -201,7 +201,7 @@ class ReportSectionRepository:
                     session_id=session_id,
                     event_name=event_name,
                     category="",  # 失败时可能没有类别信息
-                    content_data={},
+                    content_data="",
                     status=SectionStatus.FAILED,
                     error_message=error_message,
                 )

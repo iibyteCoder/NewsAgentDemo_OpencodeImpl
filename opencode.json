@@ -30,6 +30,11 @@
     }
   },
   "agent": {
+    "defaults": {
+      "tools": {
+        "webfetch": false
+      }
+    },
     "news-coordinator": {
       "mode": "primary",
       "description": "新闻协调器 - 多类别新闻收集协调器",
@@ -79,7 +84,7 @@
       "prompt": "{file:./prompts/news-processor.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 8,
+      "maxSteps": 20,
       "tools": {
         "read": true,
         "web-browser_fetch_article_content": true,

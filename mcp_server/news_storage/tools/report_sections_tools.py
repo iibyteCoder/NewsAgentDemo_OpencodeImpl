@@ -52,7 +52,7 @@ async def save_report_section_tool(
         session_id: 会话ID
         event_name: 事件名称
         category: 类别
-        content_data: 内容数据（JSON字符串）
+        content_data: 内容数据（任意格式字符串，无需严格 JSON）
 
     Returns:
         JSON格式：{success, section_id, message, section_type}
@@ -72,16 +72,13 @@ async def save_report_section_tool(
                 indent=2,
             )
 
-        # 解析 content_data
-        data = json.loads(content_data) if content_data else {}
-
-        # 保存
+        # 直接保存原始字符串（不解析 JSON，避免格式错误）
         section_id = await repo.save(
             section_type=section_type,
             session_id=session_id,
             event_name=event_name,
             category=category,
-            content_data=data,
+            content_data=content_data or "",
         )
 
         result = {
