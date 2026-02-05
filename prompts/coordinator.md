@@ -89,7 +89,25 @@ echo "report_timestamp: report_$(date +%Y%m%d_%H%M%S)"
 
 ### 5. 生成总索引
 
-使用 `@templates/total-index-template.md` 生成总索引文件。
+**参考模板**：`@templates/total-index-template.md`
+
+**总索引文件路径**：`output/{report_timestamp}/index.md`
+
+**模板清理要求**：
+
+1. **识别模板注释**：查找 HTML 注释标记（如 `<!-- 为每个成功的类别重复以下块 -->`）
+2. **清除注释内容**：删除所有 HTML 注释行
+3. **替换占位符**：将所有 `{xxx}` 占位符替换为实际值
+
+**填充规则**：
+
+- `{timestamp}` → 当前时间（格式：YYYY-MM-DD HH:MM:SS）
+- `{category_count}` → 成功的类别数量
+- `{total_events}` → 所有类别的总事件数
+- `{total_news}` → 所有类别的总新闻数
+- `{category}` → 类别名称（需要添加"新闻"后缀）
+- `{event_count}` → 该类别的事件数
+- `{news_count}` → 该类别的新闻数
 
 ## 输出要求
 
