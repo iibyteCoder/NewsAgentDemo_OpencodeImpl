@@ -2,59 +2,28 @@
 
 ---
 
-<!-- TEMPLATE_DOC_START: 以下是模板使用说明，生成内容时请删除此部分 -->
+<!-- TEMPLATE_DOC_START -->
 
-## 填充格式说明
+## 填充说明
 
-### 证据链步骤填充
+### 核心要求
 
-模板中的 `{evidence_chain_items}` 需填充为：
+1. **证据链步骤**（`{evidence_chain_items}`）：
+   - 每步包含：步骤标题、验证焦点、核心结论、支撑来源、交叉验证结果
+   - 支撑来源格式：`[{title}]({url}) - {source} - {time}`
+   - 必须包含引用的具体论述或数据
+   - 使用 ✅、⚠️、❌ 标注可靠性
 
-```markdown
-### 第{step_number}步：{step_title}
+2. **综合分析维度**（5个 `{xxx_content}` 字段）：
+   - 事实一致性、时间序列、多维度验证、逻辑合理性、信息完整性
+   - 包含具体分析和来源链接
+   - 使用对比表格（如适用）
 
-**验证焦点**：{verification_focus}
+3. **禁止事项**：
+   - 禁止使用"多个媒体报道"等抽象表述
+   - 必须提供具体的标题和链接
 
-**核心结论**：{core_conclusion}
-
-**支撑来源**（{source_count}个）：
-1. [{news_title}]({news_url}) - {news_source} - {news_publish_time}
-   - **关键数据/论述**："{quoted_text_or_data}"
-   - **可靠性**：{reliability_emoji} {reliability_level}
-
-**交叉验证结果**：
-- **数据一致性**：{data_consistency_analysis}
-- **时间吻合度**：{time_match_analysis}
-- **多方印证**：{multi_source_verification}
-
-**可靠性评估**：{reliability_emoji} {reliability_level}
-```
-
-### 综合分析填充
-
-模板中的 5 个分析维度（如 `{fact_consistency_content}`）需填充为：
-
-```markdown
-{description}
-
-**对比分析**：
-| 验证项 | 媒体A数据 | 媒体B数据 | 一致性 |
-|--------|-----------|-----------|--------|
-| {item_1} | {value_a1} | {value_b1} | {consistency_1} |
-
-**支撑来源**：
-- [{source1_title}]({source1_url}) - {source1_source}
-- [{source2_title}]({source2_url}) - {source2_source}
-```
-
-### 格式要求
-
-- 每个证据链步骤必须包含至少一个来源链接（标题、URL、媒体、时间）
-- 使用 ✅、⚠️、❌ 标注可靠性等级
-- 禁止使用"多个媒体报道"等抽象表述
-- 必须包含引用的具体论述或数据（quoted_text）
-
-<!-- TEMPLATE_DOC_END: 模板使用说明结束 -->
+<!-- TEMPLATE_DOC_END -->
 
 ---
 
