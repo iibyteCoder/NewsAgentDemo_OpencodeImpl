@@ -25,8 +25,8 @@ API引擎：Serper.dev（Google Search API，无需浏览器）
 from loguru import logger
 from mcp.server.fastmcp import FastMCP
 
-from .config.settings import get_settings
-from .tools import (
+from mcp_server.web_browser.config.settings import get_settings
+from mcp_server.web_browser.tools import (
     fetch_article_content,
     multi_search,
 )

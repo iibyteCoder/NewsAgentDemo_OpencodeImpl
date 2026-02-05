@@ -19,19 +19,19 @@ class Settings(BaseSettings):
 
     # ========== 浏览器配置 ==========
     max_concurrent_browsers: int = Field(
-        default=20,
+        default=30,
         description="最大并发浏览器数量",
         ge=1,
         le=50,
     )
     max_contexts_per_browser: int = Field(
-        default=15,
+        default=20,
         description="每个浏览器最大上下文数",
         ge=1,
         le=20,
     )
     max_context_pool_size: int = Field(
-        default=20,
+        default=30,
         description="最大上下文池大小",
         ge=1,
         le=50,
@@ -79,7 +79,7 @@ class Settings(BaseSettings):
 
     # ========== 代理配置 ==========
     proxy_server: Optional[str] = Field(
-        default=None,
+        default="localhost:7897",
         description="代理服务器地址（如 localhost:7897）",
     )
     proxy_username: Optional[str] = None

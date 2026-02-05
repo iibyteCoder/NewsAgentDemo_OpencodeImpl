@@ -46,7 +46,11 @@ class SerperEngine:
             api_key: Serper API Key，如果不提供则从环境变量读取
         """
         # 尝试从多个来源获取 API Key
-        self.api_key = api_key or os.getenv("SERPER_API_KEY")
+        self.api_key = (
+            api_key
+            or os.getenv("MCP_SERVER_SERPER_API_KEY")  # 优先读取配置中的环境变量
+            or os.getenv("SERPER_API_KEY")  # 兼容直接设置的环境变量
+        )
 
         if not self.api_key:
             logger.warning("⚠️ SERPER_API_KEY 未配置，Serper 搜索将不可用")
