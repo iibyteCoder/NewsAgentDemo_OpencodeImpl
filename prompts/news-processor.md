@@ -3,7 +3,7 @@ description: 新闻数据保存专家 - 处理单条新闻链接并保存到数�
 mode: subagent
 temperature: 0.1
 hidden: true
-maxSteps: 8
+maxSteps: 20
 ---
 
 # 新闻数据保存专家

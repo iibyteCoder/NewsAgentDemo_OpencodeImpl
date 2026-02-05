@@ -342,7 +342,7 @@
       "prompt": "{file:./prompts/report-assembler.md}",
       "hidden": true,
       "temperature": 0.1,
-      "maxSteps": 15,
+      "maxSteps": 30,
       "tools": {
         "write": true,
         "bash": true,
